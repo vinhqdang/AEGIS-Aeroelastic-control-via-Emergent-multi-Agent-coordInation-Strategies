@@ -334,6 +334,57 @@ class AeroelasticModel:
         _, eigenvectors = eigh(self.stiffness, self.mass)
         return eigenvectors.T @ self.control_influence(airspeed)
 
+    def batch_state_space(
+        self, airspeeds: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Assemble the plant at many speeds at once.
+
+        Returns ``(A, B_control, B_gust, B_force)`` with a leading batch axis.
+        ``B_force`` is the generalized control force (not premultiplied by the
+        inverse mass), which is what the per-agent control power needs.
+
+        Every aerodynamic block scales as a fixed power of speed, so the whole
+        batch is built by broadcasting rather than by looping over speeds. This
+        is what makes vectorised RL training on this plant tractable: a rollout
+        of a few hundred environments at different flight conditions costs one
+        batched einsum per integrator stage.
+        """
+        speeds = np.atleast_1d(np.asarray(airspeeds, dtype=float))
+        if np.any(speeds <= 0.0):
+            raise ValueError("all airspeeds must be positive")
+
+        batch = speeds.size
+        n, n_states = self.n_modes, self.n_states
+        u = speeds[:, None, None]
+
+        total_mass = self.mass + self._aero_mass
+        inverse_mass = np.linalg.inv(total_mass)
+        damping = self.damping + u * self._aero_damping_unit
+        stiffness = self.stiffness + u**2 * self._aero_stiffness_unit
+        lag_gain = u**2 * self._lag_gain_unit
+        force = u**2 * self._control_unit
+
+        a_matrix = np.zeros((batch, n_states, n_states))
+        a_matrix[:, :n, n : 2 * n] = np.eye(n)
+        a_matrix[:, n : 2 * n, :n] = -inverse_mass @ stiffness
+        a_matrix[:, n : 2 * n, n : 2 * n] = -inverse_mass @ damping
+        a_matrix[:, n : 2 * n, 2 * n :] = inverse_mass @ lag_gain
+        a_matrix[:, 2 * n :, :n] = speeds[:, None, None] * self._lag_from_state
+        a_matrix[:, 2 * n :, n : 2 * n] = self._lag_from_rate
+        decay = speeds[:, None] * self._lag_decay_unit[None, :]
+        rows = np.arange(2 * n, n_states)
+        a_matrix[:, rows, rows] = -decay
+
+        control = np.zeros((batch, n_states, self.n_inputs))
+        control[:, n : 2 * n, :] = inverse_mass @ force
+
+        gust = np.zeros((batch, n_states))
+        gust[:, n : 2 * n] = (
+            inverse_mass @ (-0.5 * speeds[:, None, None] * self._circulatory_unit.sum(axis=1)[:, None])
+        )[:, :, 0]
+        gust[:, 2 * n :] = -1.0
+        return a_matrix, control, gust, force
+
     # ------------------------------------------------------- span recovery
     def station_rows(self, y_frac: float) -> tuple[np.ndarray, np.ndarray]:
         """Plunge and twist modal rows at a spanwise fraction of the semispan."""

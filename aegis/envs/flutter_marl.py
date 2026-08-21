@@ -75,7 +75,20 @@ class EnvConfig:
 
     comm_mode: str = "none"
     reward_mode: str = "physics"
-    physics_weight: float = 0.7  # blend factor for reward_mode="blended"
+
+    # Blending the exact per-agent credit with a *level* of energy was a scale
+    # error: the two terms differed by ~50x, so the blend weight was meaningless
+    # and the shared term swamped the credit signal. The shared component is now
+    # potential-based shaping (Ng et al. 1999) on the modal energy, which has the
+    # same units as the control-power term and, being potential-based, cannot
+    # bias the optimal policy. `shaping_gamma` must match the PPO discount for
+    # that invariance to hold.
+    shaping_weight: float = 1.0
+    shaping_gamma: float = 0.995
+    # Floor on the energy used to normalise the credit signal, as a fraction of
+    # the reference energy. Without it the normalised credit blows up at rest.
+    energy_floor_fraction: float = 1.0e-3
+    physics_weight: float = 0.7  # retained for the legacy weighted blend
 
     effort_penalty: float = 0.02
     rate_penalty: float = 0.01

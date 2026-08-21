@@ -108,6 +108,47 @@ with `w_r` concentrated on the flutter-critical mode. `v_r^T b_k` is the modal
 residue — the quantity that decides whether agent `k` can do anything useful at
 all, and whose sign flips under control reversal.
 
+### The credit signal must be the *logarithmic* decay rate
+
+The first implementation used `r_k = -P_k` directly. It does not work, and the
+reason is instructive rather than incidental.
+
+`-P_k` is maximised by having energy available to extract. An agent is therefore
+rewarded for *sustaining* the oscillation: keep the wing ringing, and there is
+always more energy to take credit for removing. Policies trained on it converged
+to holding the wing at a bounded but undamped amplitude, scoring **+0.27 1/s**
+(energy slowly growing) against **-0.06 1/s** for a hand-tuned collocated damper.
+It is reward hacking, not merely myopia.
+
+The fix comes out of the same derivation. Divide the energy-rate budget by `E`:
+
+```
+d(log E)/dt = [ -qdot^T C qdot  +  qdot^T L x_wake  +  sum_k P_k ] / E
+```
+
+`E` is a shared scalar, so the decomposition survives division exactly and agent
+`k`'s contribution is still separable:
+
+```
+r_k  =  -P_k / (E + eps)
+```
+
+This is strictly better than the raw form on three counts:
+
+1. **It is scale invariant.** No incentive to sustain the oscillation, because
+   credit is normalised by the energy available.
+2. **It is the evaluated objective.** The reported metric is the exponential
+   energy decay rate, which *is* `(1/2) d(log E)/dt`. The credit signal and the
+   metric are now the same quantity.
+3. **Proposition 1 still holds**, now for the log-decay rate, so the closed-form
+   difference reward carries over unchanged.
+
+Switching to it flipped the sign of the result: **+0.265 -> -0.291 1/s** at
+600k steps, with training divergence falling from 0.8% to 0.0%.
+
+Potential-based shaping is applied to `log E` for the same reason, so that it
+telescopes to the evaluated decay rate and shares the credit signal's units.
+
 ### Why exact is not enough (and this is the real contribution)
 
 `r_k^phys` is **myopic**. It rewards instantaneous energy extraction, but the
@@ -262,6 +303,9 @@ phase-gradient pattern sharpening and the communication cost staying flat.
 | Proposition 2 is a truncation bound, not an exact result. | State it as such. Do not oversell. |
 | Quasi-steady flap aero over-estimates high-frequency control authority. | Documented in the plant module. Re-validate the final policy on SHARPy (UVLM + nonlinear beam) as the high-fidelity check. |
 | "Emergent" is a loaded word. | Define it operationally as the spanwise phase gradient, and measure it. Never claim more. |
+| Blending exact credit with an energy *level* is a scale error: the two terms differed by ~50x, so the blend weight was meaningless and the shared term swamped the credit. | Blend with potential-based shaping instead, which shares the credit signal's units and cannot bias the optimum. |
+| An unbounded phasor readout drives the phase-locked head's output `tanh` into saturation at initialisation, killing the gradient. | Squash the encoder readout. Without this the MoCCA policy did not learn at all. |
+| A discount of 0.985 at 200 Hz covers under four flutter cycles, and the policy learns to hold the wing bounded rather than damp it. | Energy decay is long-horizon: use 0.995 (~11 cycles). |
 
 ---
 
