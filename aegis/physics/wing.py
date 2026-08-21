@@ -134,3 +134,31 @@ GOLAND_WING = WingProperties(
     surfaces=_goland_surfaces(),
     name="goland",
 )
+
+
+def uniform_surfaces(
+    count: int,
+    inboard: float = 0.05,
+    outboard: float = 0.98,
+    hinge_frac: float = 0.75,
+) -> tuple[ControlSurface, ...]:
+    """``count`` equal-width trailing-edge surfaces spanning a fixed band.
+
+    Total control authority is held roughly constant as the count rises: the same
+    span is covered, just divided more finely. That keeps a scaling study about
+    coordination rather than about how much actuator area was added.
+    """
+    if count < 1:
+        raise ValueError(f"need at least one surface, got {count}")
+    edges = [inboard + (outboard - inboard) * i / count for i in range(count + 1)]
+    return tuple(
+        ControlSurface(f"surface_{i:02d}", edges[i], edges[i + 1], hinge_frac=hinge_frac)
+        for i in range(count)
+    )
+
+
+def goland_with_surfaces(count: int) -> WingProperties:
+    """The Goland wing with ``count`` equal trailing-edge surfaces."""
+    return WingProperties(
+        **{**GOLAND_WING.__dict__, "surfaces": uniform_surfaces(count)}
+    )

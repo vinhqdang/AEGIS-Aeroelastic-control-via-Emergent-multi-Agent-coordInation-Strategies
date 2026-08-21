@@ -105,12 +105,12 @@ VARIANTS: dict[str, Variant] = {
     "mocca_residual": Variant(
         "mocca_residual", "blended", "none", True, True, False,
         "MoCCA correcting a decentralised LQG base law",
-        base_controller="dlqg", residual_authority=0.5,
+        base_controller="dlqg", residual_authority=0.3,
     ),
     "residual_only": Variant(
         "residual_only", "blended", "none", False, False, False,
         "residual on decentralised LQG, no comms and no phasor: isolates residual",
-        base_controller="dlqg", residual_authority=0.5,
+        base_controller="dlqg", residual_authority=0.3,
     ),
 }
 
@@ -132,14 +132,21 @@ def main() -> None:
 
 def _run_one(variant: Variant, seed: int, args, outdir: Path) -> None:
     tag = f"{variant.name}_s{seed}"
+    if args.surfaces:
+        tag = f"{variant.name}_n{args.surfaces}_s{seed}"
     print(f"\n=== {tag} :: {variant.note}")
 
+    task = dict(TRAIN_TASK)
+    if args.surfaces:
+        from aegis.physics.wing import goland_with_surfaces
+
+        task["wing"] = goland_with_surfaces(args.surfaces)
     train_config = EnvConfig(
         reward_mode=variant.reward_mode,
         comm_mode=variant.comm_mode,
         base_controller=variant.base_controller,
         residual_authority=variant.residual_authority,
-        **TRAIN_TASK,
+        **task,
     )
     env = BatchedFlutterEnv(train_config, n_envs=args.n_envs, seed=seed)
     spec = PolicySpec(
@@ -175,6 +182,7 @@ def _run_one(variant: Variant, seed: int, args, outdir: Path) -> None:
         residual_authority=variant.residual_authority,
         speed_ratio_range=(1.0, 1.5),
         episode_duration=2.0,
+        **({"wing": task["wing"]} if args.surfaces else {}),
     )
     controller = LearnedController(trainer.policy, trainer.device)
     results = evaluate(
@@ -227,6 +235,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--n-envs", type=int, default=128)
     parser.add_argument("--rollout", type=int, default=128)
     parser.add_argument("--eval-episodes", type=int, default=32)
+    parser.add_argument(
+        "--surfaces", type=int, default=0,
+        help="number of control surfaces (0 keeps the default 3-surface layout)",
+    )
     parser.add_argument("--outdir", default="runs")
     return parser.parse_args()
 

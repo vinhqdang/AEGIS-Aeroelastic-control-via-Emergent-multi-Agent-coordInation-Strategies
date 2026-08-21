@@ -46,6 +46,11 @@ class PolicySpec:
     central_state_dim: int | None = None  # None selects a decentralised critic
 
 
+#: Output-layer gain for action heads. Small enough that a fresh policy is
+#: effectively a no-op, which is what makes residual control well-posed.
+ACTION_OUTPUT_GAIN = 0.01
+
+
 def _mlp(sizes: list[int], activation=nn.Tanh) -> nn.Sequential:
     layers: list[nn.Module] = []
     for index in range(len(sizes) - 1):
@@ -53,6 +58,15 @@ def _mlp(sizes: list[int], activation=nn.Tanh) -> nn.Sequential:
         if index < len(sizes) - 2:
             layers.append(activation())
     return nn.Sequential(*layers)
+
+
+def _shrink_output(module: nn.Module, gain: float = ACTION_OUTPUT_GAIN) -> nn.Module:
+    """Scale down the last linear layer so the head starts near zero output."""
+    last = [layer for layer in module.modules() if isinstance(layer, nn.Linear)][-1]
+    with torch.no_grad():
+        last.weight.mul_(gain)
+        last.bias.zero_()
+    return module
 
 
 class PhasorEncoder(nn.Module):
@@ -194,6 +208,7 @@ class MultiAgentPolicy(nn.Module):
             self.action_head: nn.Module = PhaseLockedHead(HIDDEN, spec.n_retained_modes)
         else:
             self.action_head = _mlp([HIDDEN, 1])
+        _shrink_output(self.action_head)
 
         critic_input = (
             spec.central_state_dim + identity
@@ -201,7 +216,9 @@ class MultiAgentPolicy(nn.Module):
             else feature_dim
         )
         self.critic = _mlp([critic_input, HIDDEN, HIDDEN, 1])
-        self.log_std = nn.Parameter(torch.full((1,), -0.7))
+        # sigma = 0.30. The previous 0.50 is a very large perturbation on an
+        # action space normalised to [-1, 1], and it swamps a residual channel.
+        self.log_std = nn.Parameter(torch.full((1,), -1.2))
         self.register_buffer("identity", torch.eye(spec.n_agents))
 
     # ---------------------------------------------------------------- helpers
