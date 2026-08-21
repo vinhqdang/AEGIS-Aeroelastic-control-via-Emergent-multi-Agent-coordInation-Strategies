@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# AEGIS
+media/
+outputs/
+runs/
+*.mp4
+*.gif
