@@ -223,3 +223,8 @@ outputs/
 runs/
 *.mp4
 *.gif
+paper/*.aux
+paper/*.log
+paper/*.bbl
+paper/*.blg
+paper/*.out

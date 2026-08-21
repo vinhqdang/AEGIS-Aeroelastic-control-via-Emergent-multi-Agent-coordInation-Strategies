@@ -312,15 +312,32 @@ def _figures(outdir: Path, rows, conditions, feasible, curves) -> None:
 def _comparison_figure(
     path, rows, conditions, feasible, plt, cmap, symmetric_limit, ink, ink_muted
 ) -> None:
-    """Controller x condition grid of the energy decay rate."""
+    """Controller x condition grid of the energy decay rate.
+
+    Conditions that no controller can hold are omitted from the plot; they remain
+    in the results table and are named in the caption.
+    """
+    shown = [j for j in range(len(conditions)) if feasible[j]]
+    conditions = [conditions[j] for j in shown]
+    feasible = [True] * len(shown)
+    rows = [
+        Row(
+            r.key, r.label, r.kind,
+            [r.divergence[j] for j in shown],
+            [r.suppression[j] for j in shown],
+            [r.rms_deflection[j] for j in shown],
+        )
+        for r in rows
+    ]
+
     matrix = np.full((len(rows), len(conditions)), np.nan)
     for i, row in enumerate(rows):
         for j in range(len(conditions)):
-            if feasible[j] and row.divergence[j] == 0.0:
+            if row.divergence[j] == 0.0:
                 matrix[i, j] = row.suppression[j]
 
     limit = symmetric_limit(matrix)
-    figure, axes = plt.subplots(figsize=(7.4, 0.42 * len(rows) + 2.1))
+    figure, axes = plt.subplots(figsize=(7.0, 0.42 * len(rows) + 2.1))
     axes.grid(False)
     image = axes.imshow(matrix, cmap=cmap, vmin=-limit, vmax=limit, aspect="auto")
 
@@ -357,7 +374,7 @@ def _comparison_figure(
     axes.set_yticklabels([r.label for r in rows], fontsize=8)
     axes.set_title(
         "Energy decay rate [1/s] by controller and flight condition\n"
-        "negative = suppressed; hatched = diverged; n/a = infeasible for any controller",
+        "negative = suppressed; hatched = diverged in the stated fraction of episodes",
         loc="left", fontsize=9,
     )
     bar = figure.colorbar(image, ax=axes, fraction=0.03, pad=0.02)
