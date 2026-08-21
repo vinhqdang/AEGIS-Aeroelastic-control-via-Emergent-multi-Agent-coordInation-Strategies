@@ -63,6 +63,13 @@ class PPOConfig:
     # which is the observer the policy otherwise has to discover by trial and
     # error through the policy gradient alone.
     aux_coefficient: float = 0.0
+    # Initial exploration standard deviation, in normalised action units.
+    # Scale matters here more than usual: a controller that achieves -5.5 1/s on
+    # this plant uses about 0.7% of available travel, i.e. 0.1 degrees RMS, while
+    # sigma = 0.30 corresponds to 4.5 degrees. The exploration noise is then some
+    # 40x the useful control amplitude, so the policy never experiences the fine
+    # phased actuation that works, whatever its credit signal or architecture.
+    initial_log_std: float = -1.2
     seed: int = 0
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     # Fraction of training over which the task ramps from easy to full. 0
@@ -109,6 +116,8 @@ class PPOTrainer:
 
         self.device = torch.device(self.config.device)
         self.policy = MultiAgentPolicy(spec).to(self.device)
+        with torch.no_grad():
+            self.policy.log_std.fill_(self.config.initial_log_std)
         self.optimizer = torch.optim.Adam(
             self.policy.parameters(), lr=self.config.learning_rate, eps=1e-5
         )

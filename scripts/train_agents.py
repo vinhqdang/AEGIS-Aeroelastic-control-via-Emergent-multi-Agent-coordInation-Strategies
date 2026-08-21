@@ -163,6 +163,17 @@ def _run_one(variant: Variant, seed: int, args, outdir: Path) -> None:
     print(f"\n=== {tag} :: {variant.note}")
 
     task = dict(TRAIN_TASK)
+    if args.easy:
+        # Capability probe: can the architecture reach classical performance on
+        # the SINGLE easiest condition at all? Every variant so far plateaus in
+        # the same narrow band regardless of credit signal, communication, action
+        # parameterisation, memory or supervision, which points at a systemic
+        # cause rather than an algorithmic one. If a policy trained on one
+        # condition still cannot approach the classical -5.5 1/s there, the
+        # limit is not breadth of the task distribution.
+        task["speed_ratio_range"] = (1.05, 1.05)
+        task["jam_probability"] = 0.0
+        task["tip_plunge_range"] = (0.05, 0.05)
     if args.surfaces:
         from aegis.physics.wing import goland_with_surfaces
 
@@ -192,6 +203,8 @@ def _run_one(variant: Variant, seed: int, args, outdir: Path) -> None:
             n_envs=args.n_envs,
             rollout_length=args.rollout,
             aux_coefficient=variant.aux_coefficient,
+            initial_log_std=args.log_std,
+            entropy_coefficient=args.entropy,
             seed=seed,
         ),
     )
@@ -266,6 +279,18 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--surfaces", type=int, default=0,
         help="number of control surfaces (0 keeps the default 3-surface layout)",
+    )
+    parser.add_argument(
+        "--log-std", type=float, default=-1.2,
+        help="initial exploration log sigma in action units",
+    )
+    parser.add_argument(
+        "--entropy", type=float, default=2.0e-3,
+        help="entropy bonus; lower lets PPO shrink sigma for fine control",
+    )
+    parser.add_argument(
+        "--easy", action="store_true",
+        help="train on the single easiest condition (capability probe)",
     )
     parser.add_argument("--outdir", default="runs")
     return parser.parse_args()
