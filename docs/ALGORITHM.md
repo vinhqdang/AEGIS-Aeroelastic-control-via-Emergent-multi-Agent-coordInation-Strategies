@@ -294,6 +294,80 @@ phase-gradient pattern sharpening and the communication cost staying flat.
 
 ---
 
+## 4b. What the experiments actually showed
+
+Written after running the ablations, not before. The design in sections 1-3 was
+three mechanisms; only one of them survives contact with the measurements.
+
+### Credit assignment carries the entire result
+
+Three surfaces, two seeds, evaluated on the six conditions the fault-aware oracle
+shows to be feasible:
+
+| credit signal | cells stabilised | healthy decay rate |
+|---|---|---|
+| shared scalar reward | 2/6 | **+1.09** (diverging) |
+| learned credit, centralised critic | 2/6 | +1.16 |
+| Proposition 1 physics credit | 4/6 | -0.32 |
+| exact-plus-residual | **6/6** | -0.20 |
+
+The gap between a shared reward and the physics credit is the difference between
+a policy that destabilises the wing and one that stabilises every feasible
+condition. This is the contribution.
+
+### Robustness beats the fair classical baseline; nominal damping does not
+
+The learned policies stabilise conditions that the *decentralised* LQG -- the
+correct classical comparison, since it has the same information structure --
+cannot: 6/6 versus 5/6 on three surfaces, and 9/9 versus 5/9 on eight. They do
+this with only local accelerometers and no fault detection, while the classical
+controller knows the plant model exactly.
+
+They damp more weakly at nominal. One nuance matters: the decentralised LQG's
+headline -2.06 is an average dominated by the low-speed end. Broken out by
+condition it is -5.42, -1.07, **+0.32** across 1.05/1.25/1.45 U_f -- it *fails* at
+the top of the envelope -- against roughly -0.5 flat for the learned policy. So
+the honest statement is that the learned policy is far more uniform across the
+envelope rather than uniformly worse.
+
+### The communication mechanisms did not help
+
+This is reported rather than buried. On three surfaces:
+
+| variant | cells stabilised | healthy decay rate |
+|---|---|---|
+| recurrent encoder, no message passing | 4/6 | **-0.69** |
+| phasor consensus, raw action head | 4/6 | -0.44 |
+| phasor consensus + phase-locked head | 4/6 | -0.02 |
+
+Memory helps. Consensus adds nothing. The phase-locked head actively hurts, even
+after being rewritten as a strict generalisation of an unconstrained policy. Two
+plausible reasons, both worth stating: three surfaces on a six-metre wing may
+simply have little to coordinate, especially since air data is already broadcast;
+and a modal phasor is the wrong message content for the failure mode that
+dominates the hard conditions.
+
+The second reason is testable and led to a change. With a decentralised-LQG base
+law the base already saturates the reward on healthy episodes, so nearly all the
+policy gradient comes from episodes where a surface is jammed -- and the policy
+then applies what it learned there to healthy conditions, where it is harmful.
+That is why the residual policy scored *worse than its own base law*. An agent
+cannot resolve this locally: what matters is whether a **neighbour** has failed,
+and a phasor does not carry that. The consensus message therefore gained an
+actuator-health channel.
+
+### Implementation traps, each found by running rather than reading
+
+| Trap | Consequence | Fix |
+|---|---|---|
+| `-P_k` used directly | rewards sustaining the oscillation; +0.27 vs -0.06 for a hand-tuned damper | normalise by energy (section 1) |
+| blending credit with an energy *level* | ~50x scale mismatch, shared term swamps the credit | potential-based shaping on log E |
+| unbounded phasor readout | saturates the head's tanh at init; MoCCA learned nothing | squash the readout |
+| discount 0.985 at 200 Hz | horizon under four flutter cycles; policy bounds rather than damps | 0.995 |
+| shuffled-timestep PPO updates | no gradient through the recurrence; the encoder can only learn a one-step map, and the *feedforward* variant beat it | truncated BPTT over segments |
+| default action-head init | a fresh residual policy emits large corrections and destroys its base law | small-gain output init |
+| continuous-time observer, Euler at 5 ms | `dt*|lambda|` up to 63; the LQG baseline diverged everywhere | design in discrete time |
+
 ## 5. Honest risks and limitations
 
 | Risk | Mitigation |

@@ -62,6 +62,7 @@ class Variant:
     consensus_rounds: int = 2
     base_controller: str = "none"
     residual_authority: float = 1.0
+    use_health_channel: bool = False
 
 
 VARIANTS: dict[str, Variant] = {
@@ -105,6 +106,16 @@ VARIANTS: dict[str, Variant] = {
     "mocca_residual": Variant(
         "mocca_residual", "blended", "none", True, True, False,
         "MoCCA correcting a decentralised LQG base law",
+        base_controller="dlqg", residual_authority=0.3,
+    ),
+    "residual_health": Variant(
+        "residual_health", "blended", "none", True, False, False,
+        "residual on decentralised LQG with a health-carrying consensus message",
+        base_controller="dlqg", residual_authority=0.3, use_health_channel=True,
+    ),
+    "residual_comm": Variant(
+        "residual_comm", "blended", "neighbor_local", False, False, False,
+        "residual on decentralised LQG, neighbours share raw local observations",
         base_controller="dlqg", residual_authority=0.3,
     ),
     "residual_only": Variant(
@@ -155,6 +166,7 @@ def _run_one(variant: Variant, seed: int, args, outdir: Path) -> None:
         use_phasor_consensus=variant.use_phasor_consensus,
         use_phase_locked_head=variant.use_phase_locked_head,
         consensus_rounds=variant.consensus_rounds,
+        use_health_channel=variant.use_health_channel,
         central_state_dim=CENTRAL_STATE_DIM if variant.central_critic else None,
     )
     trainer = PPOTrainer(

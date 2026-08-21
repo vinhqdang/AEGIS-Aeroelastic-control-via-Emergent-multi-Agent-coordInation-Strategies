@@ -43,6 +43,11 @@ class PolicySpec:
     consensus_weight: float = 0.5
     use_phasor_consensus: bool = False
     use_phase_locked_head: bool = False
+    # Append an actuator-health channel to the consensus message. Phase alone
+    # cannot tell an agent that a neighbour has stopped responding, which is the
+    # information a residual policy needs in order to know when NOT to correct.
+    use_health_channel: bool = False
+    saturation_index: int = 5  # observation channel holding own saturation
     central_state_dim: int | None = None  # None selects a decentralised critic
 
 
@@ -194,6 +199,8 @@ class MultiAgentPolicy(nn.Module):
                 spec.n_agents, spec.consensus_rounds, spec.consensus_weight
             )
             message_dim = 2 * spec.n_retained_modes
+            if spec.use_health_channel:
+                message_dim += 2
 
         feature_dim = spec.obs_dim + identity + message_dim
         self.trunk = nn.Sequential(
@@ -240,7 +247,14 @@ class MultiAgentPolicy(nn.Module):
             flat_hidden = hidden.reshape(batch * n_agents, -1)
             message, new_hidden = self.encoder(flat_obs, flat_hidden)
             next_hidden = new_hidden.reshape(batch, n_agents, -1)
-            phasor = self.consensus(message.reshape(batch, n_agents, -1))
+            message = message.reshape(batch, n_agents, -1)
+            if self.spec.use_health_channel:
+                # Own saturation, and its magnitude, are broadcast alongside the
+                # phasor so the consensus carries actuator health as well as phase.
+                start = self.spec.saturation_index
+                own = observation[..., start : start + 1]
+                message = torch.cat([message, own, own.abs()], dim=-1)
+            phasor = self.consensus(message)
 
         features = torch.cat([observation, identity, phasor], dim=-1)
         return (
@@ -264,7 +278,8 @@ class MultiAgentPolicy(nn.Module):
         latent = self.trunk(features)
 
         if isinstance(self.action_head, PhaseLockedHead):
-            mean = self.action_head(latent, phasor)
+            phase_part = phasor[:, : 2 * self.spec.n_retained_modes]
+            mean = self.action_head(latent, phase_part)
         else:
             mean = torch.tanh(self.action_head(latent).squeeze(-1))
 
