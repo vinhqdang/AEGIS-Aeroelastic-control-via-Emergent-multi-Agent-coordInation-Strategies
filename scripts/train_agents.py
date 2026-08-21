@@ -74,6 +74,10 @@ VARIANTS: dict[str, Variant] = {
         "mappo_shared", "shared", "none", False, False, True,
         "learned credit: centralised critic on privileged state",
     ),
+    "shaped_shared": Variant(
+        "shaped_shared", "shaped", "none", False, False, False,
+        "aligned shared shaping, NO per-agent credit: isolates the credit term",
+    ),
     "ippo_physics": Variant(
         "ippo_physics", "physics", "none", False, False, False,
         "Proposition 1 credit alone, no communication",

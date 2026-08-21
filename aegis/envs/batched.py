@@ -499,6 +499,13 @@ class BatchedFlutterEnv:
         mode = self.config.reward_mode
         if mode == "shared":
             base = np.broadcast_to(shared, physics.shape).copy()
+        elif mode == "shaped":
+            # The aligned shared signal with no per-agent credit at all. The
+            # difference between this and "blended" is exactly the contribution
+            # of the closed-form credit decomposition.
+            base = np.broadcast_to(
+                self.config.shaping_weight * shaping, physics.shape
+            ).copy()
         elif mode == "physics":
             base = physics
         else:

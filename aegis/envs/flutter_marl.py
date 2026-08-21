@@ -41,7 +41,7 @@ from aegis.sensors import SensorArray
 from aegis.simulator import WingSimulation
 
 COMM_MODES = ("none", "neighbor_local", "modal_oracle")
-REWARD_MODES = ("shared", "physics", "blended")
+REWARD_MODES = ("shared", "shaped", "physics", "blended")
 BASE_CONTROLLERS = ("none", "dlqg")
 
 _LOCAL_OBS_SIZE = 7  # see FlutterSuppressionEnv._local_observation
@@ -95,7 +95,16 @@ class EnvConfig:
     # bias the optimal policy. `shaping_gamma` must match the PPO discount for
     # that invariance to hold.
     shaping_weight: float = 1.0
-    shaping_gamma: float = 0.995
+    # Discount INSIDE the shaping term. Must be 1.0. At 0.995 the leakage term
+    # (gamma - 1) * Phi / dt is a constant negative reward once the wing is
+    # damped -- measured at -6.91 per step, totalling -977 over an episode for a
+    # controller that damps perfectly, against roughly 0 for one that lets the
+    # wing ring. Dividing by dt scales that leakage up to the same magnitude as
+    # the useful term. With 1.0 the shaping is exactly -d(log E)/dt, the decay
+    # rate the evaluation measures. This trades the Ng et al. policy-invariance
+    # guarantee for alignment with the actual objective, which is the right way
+    # round: invariance is worthless if the shaped reward prefers a ringing wing.
+    shaping_gamma: float = 1.0
     # Floor on the energy used to normalise the credit signal, as a fraction of
     # the reference energy. Without it the normalised credit blows up at rest.
     energy_floor_fraction: float = 1.0e-3
@@ -358,6 +367,10 @@ class FlutterSuppressionEnv(ParallelEnv):
         else:
             weight = self.config.physics_weight
             base = weight * physics + (1.0 - weight) * shared
+        # Note: the reference env keeps the simpler legacy blend. The batched env
+        # in aegis/envs/batched.py carries the shaping-based reward used for all
+        # training and reported results; tests/test_batched_env.py pins their
+        # physics, energy and deflection trajectories together.
 
         total = base - penalty
         if self._diverged:
