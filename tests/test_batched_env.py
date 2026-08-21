@@ -87,7 +87,7 @@ def test_batched_shapes_and_autoreset() -> None:
 
     seen_done = False
     for _ in range(40):
-        observations, rewards, dones, info = env.step(np.zeros((8, 3)))
+        observations, rewards, dones, _ = env.step(np.zeros((8, 3)))
         assert observations.shape == (8, 3, env.obs_dim)
         assert rewards.shape == (8, 3)
         assert dones.shape == (8,)
