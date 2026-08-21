@@ -226,6 +226,14 @@ mode shape. That is:
 3. Raw deflection action → phase-locked action → phase-locked plus broadband.
 4. Consensus rounds `T` = 0, 1, 2, 4; packet drop 0–50%; channel delay 0–20 ms.
 
+### Chosen framing
+
+Decided 2026-08-21: **robustness is the headline empirical result, Proposition 1
+is the theoretical contribution.** Both halves are in scope, so the experiment
+budget must cover the centralised LQR baseline plus a failure / off-design sweep
+*and* the learned-credit baselines (MAPPO, QMIX, COMA). The scaling and emergence
+study is secondary -- worth running, not the claim the paper stands on.
+
 ### The headline claim
 
 > Distributed learned control **matches** centralised optimal control at the
