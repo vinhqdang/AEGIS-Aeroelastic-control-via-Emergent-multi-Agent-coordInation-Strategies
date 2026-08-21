@@ -68,6 +68,14 @@ class CentralizedLQR:
         riccati = solve_continuous_are(state_matrix, input_matrix, state_cost, input_cost)
         self.gain = np.linalg.solve(input_cost, input_matrix.T @ riccati)
 
+        # Kept so the robustness analysis can rebuild the closed loop at a
+        # different flight condition, or with a surface removed, without
+        # re-deriving the augmentation.
+        self.design_state_matrix = state_matrix
+        self.design_input_matrix = input_matrix
+        self.n_plant = n_plant
+        self.time_constants = taus
+
         # A jammed surface contributes no command; the others must compensate.
         self._active = np.asarray(
             [s.name not in failed_surfaces for s in model.wing.surfaces], dtype=float

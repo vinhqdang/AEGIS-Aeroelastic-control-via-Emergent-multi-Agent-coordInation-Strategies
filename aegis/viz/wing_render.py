@@ -28,7 +28,9 @@ _YAW = np.deg2rad(22.0)
 _TILT = np.deg2rad(26.0)
 
 
-def project(span: np.ndarray, chord: np.ndarray, vertical: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def project(
+    span: np.ndarray, chord: np.ndarray, vertical: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """Axonometric projection of wing coordinates onto screen coordinates.
 
     ``span`` runs root to tip, ``chord`` runs leading to trailing edge, and
@@ -107,8 +109,14 @@ class WingRenderer:
                 quads.append(
                     np.column_stack(
                         (
-                            [screen_x[i, j], screen_x[i + 1, j], screen_x[i + 1, j + 1], screen_x[i, j + 1]],
-                            [screen_y[i, j], screen_y[i + 1, j], screen_y[i + 1, j + 1], screen_y[i, j + 1]],
+                            [
+                                screen_x[i, j], screen_x[i + 1, j],
+                                screen_x[i + 1, j + 1], screen_x[i, j + 1],
+                            ],
+                            [
+                                screen_y[i, j], screen_y[i + 1, j],
+                                screen_y[i + 1, j + 1], screen_y[i, j + 1],
+                            ],
                         )
                     )
                 )

@@ -24,9 +24,10 @@ the propositions it rests on.
 | Distributed sensing model | done |
 | Gust models (1-cosine, Dryden) | done, calibrated |
 | Centralised LQR + local-feedback baselines | done |
+| Robustness analysis: where the fixed gain fails | done |
+| PettingZoo multi-agent environment | done |
 | Animation / explainer renderer | done |
 | Closed-form difference reward (Proposition 1) | derived, numerically verified |
-| PettingZoo multi-agent environment | next |
 | MoCCA policy learning | next |
 
 ## Plant validation
@@ -87,14 +88,74 @@ need to inject energy into one mode so another can extract more from the coupled
 pair. MoCCA therefore uses **exact-plus-residual** credit: physics supplies the
 part it explains exactly, and a small learned head covers only the residual.
 
+## Where centralised LQR fails
+
+`scripts/robustness_sweep.py` quantifies the target. Gain synthesised at
+U = 1.10 U_f, all numbers at sea level.
+
+**Off-design airspeed** — the fixed gain has an airspeed margin of **1.40 U_f**.
+It holds its design point comfortably (growth −5.9 /s) and is unstable by
+1.50 U_f (+9.2 /s). Static divergence sits at 2.60 U_f, so this is genuine
+controller failure, not unavoidable divergence.
+
+**Lost authority** — losing any *single* surface is survivable. Losing
+`aileron_mid` + `tab_outboard` together collapses the margin to **1.02 U_f** and
+the closed loop is unstable at the design point (+2.7 /s).
+
+**Finite authority** — with real travel and rate limits, the surviving jam angle
+depends sharply on the control-effort weight, and **no weight survives 15°**:
+
+| effort weight | 0° | 4° | 8° | 12° | 15° |
+|---|---|---|---|---|---|
+| 2e2 | −6.54 | −0.11 | div | div | div |
+| 2e3 | −6.29 | −0.08 | −0.07 | div | div |
+| 2e4 | −3.56 | −0.24 | −0.16 | −0.13 | div |
+| 2e5 | −3.58 | div | div | div | div |
+
+(energy growth rate, 1/s; `div` = left the linear regime)
+
+A caveat the analysis is explicit about: **a jam angle does not move the
+closed-loop spectrum.** A held deflection is an affine input — it shifts trim,
+not the eigenvalues. Jam angle degrades performance through *saturation*, which
+only a time-domain rollout can see. Reporting an eigenvalue margin as a function
+of jam angle would be wrong, so the two studies are kept separate.
+
+## Multi-agent environment
+
+`aegis.envs.FlutterSuppressionEnv` is a PettingZoo `ParallelEnv`, one agent per
+surface, passing `parallel_api_test`.
+
+Observations are genuinely local: each agent gets its own accelerometer pair,
+local plunge rate, twist and twist rate, its own saturation fraction, and air
+data (which really is broadcast on an aircraft). No agent sees the modal state.
+
+Two ablation axes are built in, because they *are* the experiments:
+
+| `comm_mode` | meaning |
+|---|---|
+| `none` | no communication at all |
+| `neighbor_local` | inboard/outboard neighbours' raw local observations |
+| `modal_oracle` | true critical-mode amplitude and rate — an upper bound, not a proposed method |
+
+| `reward_mode` | meaning |
+|---|---|
+| `shared` | one global scalar, the naive baseline |
+| `physics` | the closed-form difference reward of Proposition 1 |
+| `blended` | exact-plus-residual, what MoCCA proposes |
+
+Episodes randomise flight condition over `speed_ratio_range` (default
+1.00–1.60 U_f), initial excitation, turbulence, and optional actuator jams —
+i.e. exactly the envelope the fixed-gain LQR cannot cover.
+
 ## Quick start
 
 ```bash
 conda activate py313
 pip install -e ".[dev]"
 
-pytest -q                                    # 42 tests, ~3 s
+pytest -q                                    # 68 tests, ~15 s
 python scripts/animate_flutter.py            # writes media/*.mp4
+python scripts/robustness_sweep.py           # tables + media/robustness_map.png
 ```
 
 `scripts/animate_flutter.py` renders four explainer animations at the same
@@ -126,6 +187,8 @@ aegis/
   gusts.py            1-cosine discrete gust, Dryden turbulence
   simulator.py        joint plant+actuator RK4 rollout, records per-agent control power
   control/lqr.py      centralised LQR and local-rate-feedback baselines
+  analysis/robustness.py  stability margins, lost authority, saturation limits
+  envs/flutter_marl.py    PettingZoo ParallelEnv, one agent per surface
   viz/                axonometric wing renderer, animation, palette
 docs/ALGORITHM.md     MoCCA design, propositions, experiment plan, limitations
 scripts/              runnable entry points

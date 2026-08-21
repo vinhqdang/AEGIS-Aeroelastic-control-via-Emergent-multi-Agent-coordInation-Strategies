@@ -117,7 +117,8 @@ class _Panels:
 
         tail = slice(max(0, index - _PHASE_TAIL), index + 1)
         self.artists["phase_tail"].set_data(
-            traj.modal_position[tail, 0], np.rad2deg(traj.modal_position[tail, self._torsion_index])
+            traj.modal_position[tail, 0],
+            np.rad2deg(traj.modal_position[tail, self._torsion_index]),
         )
         self.artists["phase_head"].set_data(
             [traj.modal_position[index, 0]],
@@ -317,7 +318,8 @@ def _phase_panel(axes, trajectory, model):
 def _power_panel(axes, trajectory, model):
     _style_axes(
         axes,
-        "energy extraction per agent   $-P_k = -(\\dot{q}^{\\mathsf{T}} b_k)\\,\\delta_k$   [W]",
+        "energy extraction per agent   "
+        "$-P_k = -(\\dot{q}^{\\mathsf{T}} b_k)\\,\\delta_k$   [W]",
     )
     names = [surface.name.replace("_", "\n") for surface in model.wing.surfaces]
     positions = np.arange(len(names))

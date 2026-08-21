@@ -14,8 +14,9 @@ something reconstructed later.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Protocol
+from typing import Protocol
 
 import numpy as np
 
@@ -31,7 +32,7 @@ DEFAULT_SUBSTEPS = 5        # 1 kHz integration
 class Controller(Protocol):
     """Anything that maps a simulation state to normalized commands in [-1, 1]."""
 
-    def __call__(self, sim: "WingSimulation") -> np.ndarray: ...
+    def __call__(self, sim: WingSimulation) -> np.ndarray: ...
 
 
 @dataclass
@@ -52,7 +53,7 @@ class Trajectory:
     airspeed: float = 0.0
     diverged: bool = False
 
-    def as_arrays(self) -> "TrajectoryArrays":
+    def as_arrays(self) -> TrajectoryArrays:
         return TrajectoryArrays(
             time=np.asarray(self.time),
             modal_position=np.asarray(self.modal_position),
@@ -294,7 +295,7 @@ class WingSimulation:
         """
         self.reset(rng, initial_tip_plunge, initial_tip_twist)
         trajectory = Trajectory(airspeed=self.airspeed)
-        n_steps = int(round(duration / self.control_dt))
+        n_steps = round(duration / self.control_dt)
         zeros = np.zeros(self.wing.n_surfaces)
 
         for _ in range(n_steps):

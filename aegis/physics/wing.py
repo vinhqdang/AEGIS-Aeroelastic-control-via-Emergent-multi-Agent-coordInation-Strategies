@@ -14,7 +14,7 @@ unsteady aerodynamic operators in their textbook form (see ``strip_aero``).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 # Thin-airfoil / atmospheric constants.
 SEA_LEVEL_DENSITY = 1.225  # kg/m^3

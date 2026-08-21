@@ -221,7 +221,9 @@ class AeroelasticModel:
 
         lag_gain = np.zeros((n, self.n_lag))
         for s in range(w.n_strips):
-            for i, (amp, eps) in enumerate(zip(WAGNER_AMPLITUDES, WAGNER_EXPONENTS)):
+            for i, (amp, eps) in enumerate(
+                zip(WAGNER_AMPLITUDES, WAGNER_EXPONENTS, strict=True)
+            ):
                 lag_gain[:, s * N_LAG_PER_STRIP + i] = circulatory[:, s] * amp * eps / b
         self._lag_gain_unit = lag_gain
 

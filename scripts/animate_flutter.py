@@ -56,7 +56,8 @@ def main() -> None:
     flutter = model.flutter_point()
     airspeed = args.airspeed or flutter.airspeed * 1.10
     print(f"flutter point: {flutter}")
-    print(f"animating at U = {airspeed:.1f} m/s  (U/U_f = {airspeed / flutter.airspeed:.3f})\n")
+    ratio = airspeed / flutter.airspeed
+    print(f"animating at U = {airspeed:.1f} m/s  (U/U_f = {ratio:.3f})\n")
 
     for case in _build_cases(model, airspeed):
         sim = WingSimulation(model, airspeed, divergence_limit=DIVERGENCE_LIMIT)

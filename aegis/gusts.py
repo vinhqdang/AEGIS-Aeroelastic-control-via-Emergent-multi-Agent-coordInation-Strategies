@@ -74,7 +74,11 @@ class DiscreteGust(GustModel):
             self.amplitude, self.start_time = self.nominal_amplitude, self.nominal_start
             return
         # Sign and magnitude both vary so a policy cannot memorise one response.
-        self.amplitude = self.nominal_amplitude * rng.uniform(0.5, 1.5) * rng.choice([-1.0, 1.0])
+        self.amplitude = (
+            self.nominal_amplitude
+            * rng.uniform(0.5, 1.5)
+            * rng.choice([-1.0, 1.0])
+        )
         self.start_time = self.nominal_start * rng.uniform(0.5, 2.0)
 
     def velocity(self, time: float) -> float:
