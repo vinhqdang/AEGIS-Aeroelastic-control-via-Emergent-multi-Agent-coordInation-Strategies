@@ -380,7 +380,12 @@ class AeroelasticModel:
 
         gust = np.zeros((batch, n_states))
         gust[:, n : 2 * n] = (
-            inverse_mass @ (-0.5 * speeds[:, None, None] * self._circulatory_unit.sum(axis=1)[:, None])
+            inverse_mass
+            @ (
+                -0.5
+                * speeds[:, None, None]
+                * self._circulatory_unit.sum(axis=1)[:, None]
+            )
         )[:, :, 0]
         gust[:, 2 * n :] = -1.0
         return a_matrix, control, gust, force

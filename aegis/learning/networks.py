@@ -130,23 +130,31 @@ class PhaseLockedHead(nn.Module):
     def __init__(self, feature_dim: int, n_retained_modes: int):
         super().__init__()
         self.n_retained_modes = n_retained_modes
-        # Per mode: gain, cos(psi), sin(psi). Plus one broadband channel.
+        # Per mode: gain, cos(psi), sin(psi). Plus a general (broadband) channel.
         self.head = _mlp([feature_dim, HIDDEN, 3 * n_retained_modes + 1])
 
     def forward(self, features: torch.Tensor, phasor: torch.Tensor) -> torch.Tensor:
-        """``features`` is ``(batch, F)``, ``phasor`` is ``(batch, 2R)``."""
+        """``features`` is ``(batch, F)``, ``phasor`` is ``(batch, 2R)``.
+
+        The resonant term is added to a general action channel rather than
+        replacing it, which makes this head a strict generalisation of the plain
+        one: setting the gains to zero recovers an unconstrained policy. The
+        first version *replaced* the general action, so the parameterisation was
+        a restriction, and the resulting policy scored worse than its own
+        ablation. A resonant prior should be an inductive bias, not a cage.
+        """
         raw = self.head(features)
         modes = self.n_retained_modes
         gain = torch.tanh(raw[:, :modes])
         rotation = raw[:, modes : 3 * modes].reshape(-1, modes, 2)
         rotation = rotation / (rotation.norm(dim=-1, keepdim=True) + 1e-6)
-        broadband = torch.tanh(raw[:, -1])
+        general = raw[:, -1]
 
         components = phasor.reshape(-1, modes, 2)
         rotated = (
             components[..., 0] * rotation[..., 0] - components[..., 1] * rotation[..., 1]
         )
-        return torch.tanh((gain * rotated).sum(dim=-1) + broadband)
+        return torch.tanh(general + (gain * rotated).sum(dim=-1))
 
 
 class MultiAgentPolicy(nn.Module):

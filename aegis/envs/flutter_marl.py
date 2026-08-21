@@ -42,6 +42,7 @@ from aegis.simulator import WingSimulation
 
 COMM_MODES = ("none", "neighbor_local", "modal_oracle")
 REWARD_MODES = ("shared", "physics", "blended")
+BASE_CONTROLLERS = ("none", "dlqg")
 
 _LOCAL_OBS_SIZE = 7  # see FlutterSuppressionEnv._local_observation
 
@@ -75,6 +76,16 @@ class EnvConfig:
 
     comm_mode: str = "none"
     reward_mode: str = "physics"
+
+    # Residual control. With "dlqg" each agent's command is a fully decentralised
+    # LQG term plus the policy's correction, scaled by residual_authority. A zero
+    # correction then recovers the classical controller exactly, so nominal
+    # performance is a floor rather than something the policy must rediscover,
+    # and learning is spent only on the regimes where the classical law fails.
+    # Everything stays decentralised: the base law uses one observer per surface
+    # on that surface's own two accelerometers, and no agent communicates.
+    base_controller: str = "none"
+    residual_authority: float = 1.0
 
     # Blending the exact per-agent credit with a *level* of energy was a scale
     # error: the two terms differed by ~50x, so the blend weight was meaningless
@@ -110,6 +121,13 @@ class EnvConfig:
             raise ValueError("jam_probability must lie in [0, 1]")
         if not 0.0 <= self.physics_weight <= 1.0:
             raise ValueError("physics_weight must lie in [0, 1]")
+        if self.base_controller not in BASE_CONTROLLERS:
+            raise ValueError(
+                f"base_controller must be one of {BASE_CONTROLLERS}, "
+                f"got {self.base_controller}"
+            )
+        if not 0.0 < self.residual_authority <= 1.0:
+            raise ValueError("residual_authority must lie in (0, 1]")
 
 
 @dataclass(frozen=True)

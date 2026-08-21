@@ -14,8 +14,14 @@ they are to beat and how implementable they are:
    condition", and any claim about off-design failure has to survive it.
 4. :class:`BatchedLQG` -- gain-scheduled LQR driven by a steady-state Kalman
    observer that sees **only the same local accelerometers the agents get**.
-   This is the implementable classical controller, and it is the one AEGIS has
-   to actually beat.
+   Implementable, but still *centralised*: one observer, one gain, all six
+   channels fused and all three surfaces commanded together.
+5. :class:`BatchedDecentralizedLQG` -- the same idea done properly
+   decentralised. Each surface runs its **own** observer on its **own** two
+   accelerometers and commands only itself, with no communication at all. This
+   is the correct classical comparison for a distributed learned policy, because
+   decentralisation always costs performance and comparing against a centralised
+   controller confounds the method with the information structure.
 
 Rung 4 exists because comparing a learned policy that uses local accelerometers
 against an LQR handed the exact modal state and the wake states would be a
@@ -162,7 +168,10 @@ def _measurement_model(
     plant = model.state_space(airspeed)
     n_plant, n_modes = model.n_states, model.n_modes
     acceleration_rows = np.hstack(
-        [plant.a_matrix[n_modes : 2 * n_modes, :], plant.control_matrix[n_modes : 2 * n_modes, :]]
+        [
+            plant.a_matrix[n_modes : 2 * n_modes, :],
+            plant.control_matrix[n_modes : 2 * n_modes, :],
+        ]
     )
 
     sensors = SensorArray(model)
@@ -371,4 +380,201 @@ class BatchedLQG:
         # A diverging plant drives the estimate to infinity; keep it finite so the
         # episode still reports a divergence rather than a NaN.
         self._estimate = np.clip(np.nan_to_num(self._estimate), -1e8, 1e8)
+        return np.clip(command / self._travel, -1.0, 1.0)
+
+
+class BatchedJamAwareLQR:
+    """Scheduled LQR that is *told* which surface failed and re-synthesised for it.
+
+    This is the fault-detection-and-reconfiguration upper bound. It is not a fair
+    competitor -- it gets oracle knowledge of the failure and the full plant state
+    -- but it answers the question that decides whether a result means anything:
+    **is this evaluation cell feasible at all?**
+
+    If even this controller diverges on a cell, no controller with these actuators
+    can hold it, and reporting that cell as a failure of a learned policy would be
+    misleading. Cells it survives are genuine targets.
+    """
+
+    name = "lqr_jam_aware"
+
+    def __init__(
+        self,
+        model: AeroelasticModel,
+        speed_range: tuple[float, float],
+        control_dt: float,
+        effort_weight: float = 2.0e4,
+        rate_weight: float = 1.0e2,
+    ):
+        self.model = model
+        self.n_surfaces = model.wing.n_surfaces
+        self.speeds = np.linspace(speed_range[0], speed_range[1], _GRID_POINTS)
+        self._travel = np.asarray([s.max_deflection for s in model.wing.surfaces])
+
+        # One gain bank per failure hypothesis: none, or each single surface lost.
+        # A lost surface is removed from the input matrix, so the synthesis knows
+        # it cannot be used and redistributes authority to the survivors.
+        self.banks = []
+        for failed in [-1, *range(self.n_surfaces)]:
+            gains = []
+            for speed in self.speeds:
+                transition, input_matrix = _discrete_plant(model, speed, control_dt)
+                reduced = input_matrix.copy()
+                if failed >= 0:
+                    reduced[:, failed] = 0.0
+                state_cost, input_cost = _cost_matrices(model, effort_weight, rate_weight)
+                riccati = solve_discrete_are(transition, reduced, state_cost, input_cost)
+                gains.append(
+                    np.linalg.solve(
+                        input_cost + reduced.T @ riccati @ reduced,
+                        reduced.T @ riccati @ transition,
+                    )
+                )
+            self.banks.append(np.stack(gains))
+
+    def reset(self, n_envs: int) -> None:
+        return None
+
+    def __call__(self, env, observation: np.ndarray) -> np.ndarray:
+        jam_mask = env._jam_mask
+        failed = np.where(jam_mask.any(axis=1), jam_mask.argmax(axis=1), -1)
+        position = np.interp(env.airspeed, self.speeds, np.arange(self.speeds.size))
+        index = np.clip(np.rint(position).astype(int), 0, self.speeds.size - 1)
+
+        augmented = np.concatenate([env.plant_state, env.deflection], axis=-1)
+        command = np.zeros((env.n_envs, self.n_surfaces))
+        for bank_index, bank in enumerate(self.banks):
+            hypothesis = bank_index - 1
+            rows = np.nonzero(failed == hypothesis)[0]
+            if rows.size == 0:
+                continue
+            command[rows] = -np.einsum(
+                "nkj,nj->nk", bank[index[rows]], augmented[rows]
+            )
+        return np.clip(command / self._travel, -1.0, 1.0)
+
+
+class BatchedDecentralizedLQG:
+    """One independent observer and gain per surface. No communication.
+
+    This is the fair classical comparison for a distributed learned policy. Each
+    agent gets the two accelerometer channels at its own station and commands
+    only its own surface; it never sees the other stations and never exchanges
+    anything. It still knows the plant model, which is a genuine advantage over
+    a learned policy, so it is a strong baseline rather than a straw man.
+
+    Decentralisation costs performance -- that is a known result in distributed
+    control, not a defect of this implementation. Reporting a distributed policy
+    against a *centralised* LQG would confound the control method with the
+    information structure available to it, which is why this rung exists.
+    """
+
+    name = "dlqg_local"
+
+    def __init__(
+        self,
+        model: AeroelasticModel,
+        speed_range: tuple[float, float],
+        control_dt: float,
+        effort_weight: float = 2.0e4,
+        rate_weight: float = 1.0e2,
+        process_noise: float = 1.0e-4,
+        measurement_noise: float = 1.0e-6,
+    ):
+        self.model = model
+        self.n_surfaces = model.wing.n_surfaces
+        self.dimension = model.n_states + self.n_surfaces
+        self.speeds = np.linspace(speed_range[0], speed_range[1], _GRID_POINTS)
+        self._travel = np.asarray([s.max_deflection for s in model.wing.surfaces])
+
+        # Per agent: a gain that may only use its own column, and an observer
+        # that may only use its own two measurement rows.
+        self.gains, self.observer_gains = [], []
+        self.transitions, self.inputs, self.measurements = [], [], []
+        for agent in range(self.n_surfaces):
+            gains, observers = [], []
+            transitions, inputs, measurements = [], [], []
+            rows = [2 * agent, 2 * agent + 1]
+            for speed in self.speeds:
+                transition, input_matrix = _discrete_plant(model, speed, control_dt)
+                full_measurement = _measurement_model(model, speed)
+                local_measurement = full_measurement[rows, :]
+
+                reduced_input = np.zeros_like(input_matrix)
+                reduced_input[:, agent] = input_matrix[:, agent]
+                state_cost, input_cost = _cost_matrices(model, effort_weight, rate_weight)
+                riccati = solve_discrete_are(
+                    transition, reduced_input, state_cost, input_cost
+                )
+                gains.append(
+                    np.linalg.solve(
+                        input_cost + reduced_input.T @ riccati @ reduced_input,
+                        reduced_input.T @ riccati @ transition,
+                    )
+                )
+                observers.append(
+                    _discrete_observer_gain(
+                        model,
+                        speed,
+                        control_dt,
+                        local_measurement,
+                        process_noise,
+                        measurement_noise,
+                    )
+                )
+                transitions.append(transition)
+                inputs.append(reduced_input)
+                measurements.append(local_measurement)
+
+            self.gains.append(np.stack(gains))
+            self.observer_gains.append(np.stack(observers))
+            self.transitions.append(np.stack(transitions))
+            self.inputs.append(np.stack(inputs))
+            self.measurements.append(np.stack(measurements))
+
+        self._estimates: list[np.ndarray] | None = None
+
+    def reset(self, n_envs: int) -> None:
+        self._estimates = [
+            np.zeros((n_envs, self.dimension)) for _ in range(self.n_surfaces)
+        ]
+
+    def _blend(self, airspeed: np.ndarray, stack: np.ndarray) -> np.ndarray:
+        position = np.interp(airspeed, self.speeds, np.arange(self.speeds.size))
+        lower = np.clip(np.floor(position).astype(int), 0, self.speeds.size - 1)
+        upper = np.clip(lower + 1, 0, self.speeds.size - 1)
+        weight = (position - lower).reshape(-1, *([1] * (stack.ndim - 1)))
+        return (1.0 - weight) * stack[lower] + weight * stack[upper]
+
+    def __call__(self, env, observation: np.ndarray) -> np.ndarray:
+        if self._estimates is None or self._estimates[0].shape[0] != env.n_envs:
+            self.reset(env.n_envs)
+        assert self._estimates is not None
+
+        scale = env.scales.acceleration
+        command = np.zeros((env.n_envs, self.n_surfaces))
+        for agent in range(self.n_surfaces):
+            measured = np.stack(
+                [observation[:, agent, 0] * scale, observation[:, agent, 1] * scale],
+                axis=-1,
+            )
+            transition = self._blend(env.airspeed, self.transitions[agent])
+            input_matrix = self._blend(env.airspeed, self.inputs[agent])
+            measurement = self._blend(env.airspeed, self.measurements[agent])
+            observer_gain = self._blend(env.airspeed, self.observer_gains[agent])
+            gain = self._blend(env.airspeed, self.gains[agent])
+
+            estimate = self._estimates[agent]
+            own = -np.einsum("nkj,nj->nk", gain, estimate)
+            own = np.clip(own, -self._travel, self._travel)
+            command[:, agent] = own[:, agent]
+
+            innovation = measured - np.einsum("nij,nj->ni", measurement, estimate)
+            updated = (
+                np.einsum("nij,nj->ni", transition, estimate)
+                + np.einsum("nik,nk->ni", input_matrix, own)
+                + np.einsum("nik,nk->ni", observer_gain, innovation)
+            )
+            self._estimates[agent] = np.clip(np.nan_to_num(updated), -1e8, 1e8)
+
         return np.clip(command / self._travel, -1.0, 1.0)

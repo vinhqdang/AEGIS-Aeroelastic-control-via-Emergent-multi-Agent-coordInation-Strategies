@@ -39,10 +39,10 @@ def _batched_rollout(config: EnvConfig, actions: np.ndarray):
     env = BatchedFlutterEnv(config, n_envs=1, seed=0)
     energies, deflections = [], []
     for step in range(actions.shape[0]):
-        _, _, dones, info = env.step(actions[step][None, :])
+        _, _, dones, step_info = env.step(actions[step][None, :])
         if dones[0]:
             break
-        energies.append(info["energy"][0])
+        energies.append(step_info["energy"][0])
         deflections.append(env.deflection[0].copy())
     return np.asarray(energies), np.asarray(deflections)
 
@@ -109,7 +109,8 @@ def test_batched_observation_width_matches_reference(comm_mode: str) -> None:
     config = EnvConfig(comm_mode=comm_mode, **FIXED)
     reference = FlutterSuppressionEnv(config)
     batched = BatchedFlutterEnv(config, n_envs=2, seed=3)
-    assert batched.obs_dim == reference.observation_space(reference.possible_agents[0]).shape[0]
+    expected = reference.observation_space(reference.possible_agents[0]).shape[0]
+    assert batched.obs_dim == expected
 
 
 def test_jam_holds_in_batched_env() -> None:

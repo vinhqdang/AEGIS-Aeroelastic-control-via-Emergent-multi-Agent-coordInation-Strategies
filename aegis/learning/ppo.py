@@ -13,6 +13,14 @@ Two details that matter for correctness rather than performance:
 * **Advantages are computed per agent.** With the physics credit each agent gets
   a different reward, so a single shared advantage would throw away exactly the
   signal the method is about.
+* **Updates run on sequences, not on shuffled timesteps.** The first version
+  stored the hidden state per step and re-ran the policy on individual samples.
+  That trains the recurrence as a one-step map: no gradient flows through time,
+  so the phasor encoder cannot learn to integrate local accelerations into a
+  modal estimate, which is the entire purpose of it. Minibatches are therefore
+  segments of ``bptt_length`` consecutive steps, unrolled with gradient from a
+  detached stored hidden state, with the hidden state zeroed inside the segment
+  wherever an episode ended.
 """
 
 from __future__ import annotations
@@ -35,6 +43,11 @@ class PPOConfig:
     rollout_length: int = 128
     epochs: int = 4
     minibatches: int = 4
+    # Truncated BPTT segment length. The recurrent encoder is trained by
+    # unrolling this many steps with gradient from the stored hidden state.
+    # Sampling independent timesteps instead gives the recurrence no temporal
+    # gradient at all, so it can only ever learn a one-step map.
+    bptt_length: int = 32
     learning_rate: float = 3.0e-4
     gamma: float = 0.995          # ~1 s horizon at 200 Hz, ~11 flutter cycles.
     # Energy decay is a long-horizon behaviour: at 0.985 the horizon covered
@@ -47,6 +60,9 @@ class PPOConfig:
     max_grad_norm: float = 0.5
     seed: int = 0
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
+    # Fraction of training over which the task ramps from easy to full. 0
+    # disables the curriculum.
+    curriculum_fraction: float = 0.4
 
 
 @dataclass
@@ -106,6 +122,11 @@ class PPOTrainer:
         hidden = self.policy.initial_hidden(n_envs, self.device)
 
         for update in range(n_updates):
+            if config.curriculum_fraction > 0.0:
+                progress_fraction = (update + 1) / max(
+                    1, int(config.curriculum_fraction * n_updates)
+                )
+                self.env.set_task_difficulty(progress_fraction)
             batch, observation, hidden = self._collect(observation, hidden)
             losses = self._optimise(batch)
 
@@ -140,7 +161,9 @@ class PPOTrainer:
         n_envs, n_agents = self.env.n_envs, self.env.n_agents
         length = config.rollout_length
 
-        observations = torch.zeros(length, n_envs, n_agents, self.spec.obs_dim, device=self.device)
+        observations = torch.zeros(
+            length, n_envs, n_agents, self.spec.obs_dim, device=self.device
+        )
         hiddens = torch.zeros(length, *hidden.shape, device=self.device)
         actions = torch.zeros(length, n_envs, n_agents, device=self.device)
         log_probs = torch.zeros(length, n_envs, n_agents, device=self.device)
@@ -149,7 +172,9 @@ class PPOTrainer:
         dones = torch.zeros(length, n_envs, device=self.device)
         central = None
         if self.spec.central_state_dim is not None:
-            central = torch.zeros(length, n_envs, self.spec.central_state_dim, device=self.device)
+            central = torch.zeros(
+                length, n_envs, self.spec.central_state_dim, device=self.device
+            )
 
         diverged_count, energy_sum = 0, 0.0
         for step in range(length):
@@ -187,16 +212,17 @@ class PPOTrainer:
             _, _, last_value, _ = self.policy(observation, hidden, central_state)
 
         advantages, returns = self._gae(rewards, values, dones, last_value)
+        # Time-major throughout: the optimiser slices consecutive segments, so
+        # flattening here would destroy the sequence structure it needs.
         batch = {
-            "observations": observations.reshape(-1, n_agents, self.spec.obs_dim),
-            "hiddens": hiddens.reshape(-1, *hidden.shape[1:]),
-            "actions": actions.reshape(-1, n_agents),
-            "log_probs": log_probs.reshape(-1, n_agents),
-            "advantages": advantages.reshape(-1, n_agents),
-            "returns": returns.reshape(-1, n_agents),
-            "central": central.reshape(-1, self.spec.central_state_dim)
-            if central is not None
-            else None,
+            "observations": observations,
+            "hiddens": hiddens,
+            "actions": actions,
+            "log_probs": log_probs,
+            "advantages": advantages,
+            "returns": returns,
+            "dones": dones,
+            "central": central,
             "divergence_rate": diverged_count / (length * n_envs),
             "mean_energy": energy_sum / length,
         }
@@ -233,64 +259,97 @@ class PPOTrainer:
 
     # --------------------------------------------------------------- optimise
     def _optimise(self, batch: dict) -> tuple[float, float, float]:
+        """PPO update over segments of consecutive steps, with BPTT."""
         config = self.config
-        n_samples = batch["observations"].shape[0]
-        indices = np.arange(n_samples)
-        minibatch_size = max(1, n_samples // config.minibatches)
+        length, n_envs = batch["actions"].shape[0], batch["actions"].shape[1]
+        segment = min(config.bptt_length, length)
+        n_segments = length // segment
 
         advantages = batch["advantages"]
         normalised = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
+        pairs = np.array(
+            [(seg, env) for seg in range(n_segments) for env in range(n_envs)], dtype=int
+        )
+        batch_size = max(1, pairs.shape[0] // config.minibatches)
+
         policy_losses, value_losses, entropies = [], [], []
         for _ in range(config.epochs):
-            np.random.shuffle(indices)
-            for start in range(0, n_samples, minibatch_size):
-                slice_indices = torch.as_tensor(
-                    indices[start : start + minibatch_size], device=self.device
+            np.random.shuffle(pairs)
+            for offset in range(0, pairs.shape[0], batch_size):
+                losses = self._segment_update(
+                    batch, normalised, pairs[offset : offset + batch_size], segment
                 )
-                central = (
-                    batch["central"][slice_indices] if batch["central"] is not None else None
-                )
-                mean, _, value, _ = self.policy(
-                    batch["observations"][slice_indices],
-                    batch["hiddens"][slice_indices],
-                    central,
-                )
-                distribution = self.policy.distribution(mean)
-                log_prob = distribution.log_prob(batch["actions"][slice_indices])
-                ratio = (log_prob - batch["log_probs"][slice_indices]).exp()
+                policy_losses.append(losses[0])
+                value_losses.append(losses[1])
+                entropies.append(losses[2])
 
-                minibatch_advantage = normalised[slice_indices]
-                unclipped = ratio * minibatch_advantage
-                clipped = (
-                    ratio.clamp(1.0 - config.clip_range, 1.0 + config.clip_range)
-                    * minibatch_advantage
-                )
-                policy_loss = -torch.min(unclipped, clipped).mean()
-                value_loss = (value - batch["returns"][slice_indices]).pow(2).mean()
-                entropy = distribution.entropy().mean()
-
-                loss = (
-                    policy_loss
-                    + config.value_coefficient * value_loss
-                    - config.entropy_coefficient * entropy
-                )
-                self.optimizer.zero_grad(set_to_none=True)
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(
-                    self.policy.parameters(), config.max_grad_norm
-                )
-                self.optimizer.step()
-
-                policy_losses.append(float(policy_loss))
-                value_losses.append(float(value_loss))
-                entropies.append(float(entropy))
-
+        if not policy_losses:
+            return 0.0, 0.0, 0.0
         return (
             float(np.mean(policy_losses)),
             float(np.mean(value_losses)),
             float(np.mean(entropies)),
         )
+
+    def _segment_update(
+        self, batch: dict, normalised: torch.Tensor, chunk: np.ndarray, segment: int
+    ) -> tuple[float, float, float]:
+        """One PPO step on a minibatch of (segment, environment) sequences."""
+        config = self.config
+        starts = torch.as_tensor(chunk[:, 0] * segment, device=self.device)
+        envs = torch.as_tensor(chunk[:, 1], device=self.device)
+
+        # Detached hidden state at the segment start: truncated BPTT.
+        hidden = batch["hiddens"][starts, envs].detach()
+
+        log_probs, values, entropy_terms = [], [], []
+        for offset in range(segment):
+            time_index = starts + offset
+            observation = batch["observations"][time_index, envs]
+            central = (
+                batch["central"][time_index, envs]
+                if batch["central"] is not None
+                else None
+            )
+            mean, _, value, next_hidden = self.policy(observation, hidden, central)
+            distribution = self.policy.distribution(mean)
+            log_probs.append(distribution.log_prob(batch["actions"][time_index, envs]))
+            values.append(value)
+            entropy_terms.append(distribution.entropy())
+            # Zero the recurrent state where an episode ended inside the segment.
+            alive = (1.0 - batch["dones"][time_index, envs]).view(-1, 1, 1)
+            hidden = next_hidden * alive
+
+        log_prob = torch.stack(log_probs)
+        value = torch.stack(values)
+        entropy = torch.stack(entropy_terms).mean()
+
+        steps = torch.arange(segment, device=self.device).unsqueeze(1)
+        time_index = starts.unsqueeze(0) + steps
+        env_index = envs.unsqueeze(0).expand(segment, -1)
+        old_log_prob = batch["log_probs"][time_index, env_index]
+        advantage = normalised[time_index, env_index]
+        target = batch["returns"][time_index, env_index]
+
+        ratio = (log_prob - old_log_prob).exp()
+        unclipped = ratio * advantage
+        clipped = (
+            ratio.clamp(1.0 - config.clip_range, 1.0 + config.clip_range) * advantage
+        )
+        policy_loss = -torch.min(unclipped, clipped).mean()
+        value_loss = (value - target).pow(2).mean()
+
+        loss = (
+            policy_loss
+            + config.value_coefficient * value_loss
+            - config.entropy_coefficient * entropy
+        )
+        self.optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.policy.parameters(), config.max_grad_norm)
+        self.optimizer.step()
+        return float(policy_loss), float(value_loss), float(entropy)
 
     # ------------------------------------------------------------------ act
     @torch.no_grad()

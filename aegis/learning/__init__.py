@@ -3,4 +3,4 @@
 from aegis.learning.networks import MultiAgentPolicy, PolicySpec
 from aegis.learning.ppo import PPOConfig, PPOTrainer, TrainingLog
 
-__all__ = ["MultiAgentPolicy", "PolicySpec", "PPOConfig", "PPOTrainer", "TrainingLog"]
+__all__ = ["MultiAgentPolicy", "PPOConfig", "PPOTrainer", "PolicySpec", "TrainingLog"]

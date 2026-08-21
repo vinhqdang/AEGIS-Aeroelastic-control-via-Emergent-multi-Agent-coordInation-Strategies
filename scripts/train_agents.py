@@ -60,6 +60,8 @@ class Variant:
     central_critic: bool
     note: str
     consensus_rounds: int = 2
+    base_controller: str = "none"
+    residual_authority: float = 1.0
 
 
 VARIANTS: dict[str, Variant] = {
@@ -100,6 +102,16 @@ VARIANTS: dict[str, Variant] = {
         "mocca", "blended", "none", True, True, False,
         "MoCCA: phasor consensus + phase-locked actions + blended credit",
     ),
+    "mocca_residual": Variant(
+        "mocca_residual", "blended", "none", True, True, False,
+        "MoCCA correcting a decentralised LQG base law",
+        base_controller="dlqg", residual_authority=0.5,
+    ),
+    "residual_only": Variant(
+        "residual_only", "blended", "none", False, False, False,
+        "residual on decentralised LQG, no comms and no phasor: isolates residual",
+        base_controller="dlqg", residual_authority=0.5,
+    ),
 }
 
 
@@ -123,7 +135,11 @@ def _run_one(variant: Variant, seed: int, args, outdir: Path) -> None:
     print(f"\n=== {tag} :: {variant.note}")
 
     train_config = EnvConfig(
-        reward_mode=variant.reward_mode, comm_mode=variant.comm_mode, **TRAIN_TASK
+        reward_mode=variant.reward_mode,
+        comm_mode=variant.comm_mode,
+        base_controller=variant.base_controller,
+        residual_authority=variant.residual_authority,
+        **TRAIN_TASK,
     )
     env = BatchedFlutterEnv(train_config, n_envs=args.n_envs, seed=seed)
     spec = PolicySpec(
@@ -155,11 +171,18 @@ def _run_one(variant: Variant, seed: int, args, outdir: Path) -> None:
     eval_config = EnvConfig(
         reward_mode=variant.reward_mode,
         comm_mode=variant.comm_mode,
+        base_controller=variant.base_controller,
+        residual_authority=variant.residual_authority,
         speed_ratio_range=(1.0, 1.5),
         episode_duration=2.0,
     )
     controller = LearnedController(trainer.policy, trainer.device)
-    results = evaluate(controller, eval_config, standard_conditions(), n_episodes=args.eval_episodes)
+    results = evaluate(
+        controller,
+        eval_config,
+        standard_conditions(),
+        n_episodes=args.eval_episodes,
+    )
 
     worst = max(r.divergence_rate for r in results)
     healthy = [r for r in results if r.condition.jam_surface < 0]

@@ -73,8 +73,28 @@ class BatchedFlutterEnv:
         self._max_steps = round(config.episode_duration / config.control_dt)
 
         self.rng = np.random.default_rng(seed)
+        self._base = self._build_base_controller()
         self._allocate()
         self.reset()
+
+    def _build_base_controller(self):
+        """Optional distributed base law the policy writes corrections on top of."""
+        if self.config.base_controller == "none":
+            return None
+        from aegis.control.batched_baselines import BatchedDecentralizedLQG
+
+        low, high = self.config.speed_ratio_range
+        return BatchedDecentralizedLQG(
+            self.model,
+            (self.flutter_speed * low, self.flutter_speed * high),
+            self.config.control_dt,
+        )
+
+    def base_action(self, observation: np.ndarray) -> np.ndarray:
+        """Normalised base command, zeros when no base controller is configured."""
+        if self._base is None:
+            return np.zeros((self.n_envs, self.n_agents))
+        return self._base(self, observation)
 
     # -------------------------------------------------------------- allocation
     def _message_size(self) -> int:
@@ -101,6 +121,27 @@ class BatchedFlutterEnv:
         self._active = np.ones(n, dtype=bool)
         self._finished = np.zeros(n, dtype=bool)
         self._previous_energy = np.zeros(n)
+        self._base_command = np.zeros((n, k))
+        self._speed_ratio_high = self.config.speed_ratio_range[1]
+        self._jam_probability = self.config.jam_probability
+
+    def set_task_difficulty(self, fraction: float) -> None:
+        """Interpolate the sampling ranges from easy to full difficulty.
+
+        ``fraction`` runs 0 (easiest) to 1 (the configured task). Early training
+        at the full distribution spends most of its samples on episodes that
+        diverge within a few control steps, which is a very sparse signal: the
+        policy sees the divergence penalty but almost no examples of what damping
+        looks like. Ramping the top of the speed range and the failure rate gives
+        it a gradient to follow.
+
+        Only the *sampling* is eased. The plant, the limits and the evaluation
+        grid are untouched, so reported results are always on the full task.
+        """
+        fraction = float(np.clip(fraction, 0.0, 1.0))
+        low, high = self.config.speed_ratio_range
+        self._speed_ratio_high = low + fraction * (high - low)
+        self._jam_probability = fraction * self.config.jam_probability
 
     # ------------------------------------------------------------------ reset
     def reset(self) -> np.ndarray:
@@ -108,6 +149,8 @@ class BatchedFlutterEnv:
         self._reset_subset(np.arange(self.n_envs))
         self._active[:] = True
         self._finished[:] = False
+        if self._base is not None:
+            self._base.reset(self.n_envs)
         return self._observations()
 
     def reset_to(
@@ -171,13 +214,16 @@ class BatchedFlutterEnv:
         if gust_seed is not None:
             self.rng = np.random.default_rng(gust_seed)
         self._draw_gust(indices)
+        if self._base is not None:
+            self._base.reset(self.n_envs)
         return self._observations()
 
     def _reset_subset(self, indices: np.ndarray) -> None:
         if indices.size == 0:
             return
         count = indices.size
-        low, high = self.config.speed_ratio_range
+        low = self.config.speed_ratio_range[0]
+        high = max(getattr(self, "_speed_ratio_high", self.config.speed_ratio_range[1]), low)
         speeds = self.flutter_speed * self.rng.uniform(low, high, size=count)
         self._airspeed[indices] = speeds
 
@@ -196,8 +242,9 @@ class BatchedFlutterEnv:
 
         self._jam_mask[indices] = False
         self._jam_value[indices] = 0.0
-        if self.config.jam_probability > 0.0:
-            jammed = self.rng.random(count) < self.config.jam_probability
+        jam_probability = getattr(self, "_jam_probability", self.config.jam_probability)
+        if jam_probability > 0.0:
+            jammed = self.rng.random(count) < jam_probability
             victims = self.rng.integers(0, self.n_agents, size=count)
             angles = self.rng.uniform(*self.config.jam_angle_range, size=count)
             rows = indices[jammed]
@@ -247,6 +294,10 @@ class BatchedFlutterEnv:
         ``(n_envs, n_agents)``.
         """
         actions = np.asarray(actions, dtype=float).reshape(self.n_envs, self.n_agents)
+        if self._base is not None:
+            actions = self._base_command + self.config.residual_authority * np.clip(
+                actions, -1.0, 1.0
+            )
         command = np.clip(actions, -1.0, 1.0) * self._travel
         previous = self._deflection.copy()
         frozen_plant = self._plant.copy()
@@ -366,7 +417,14 @@ class BatchedFlutterEnv:
             ],
             axis=-1,
         )
-        return np.concatenate([local, self._messages(local)], axis=-1).astype(np.float32)
+        observation = np.concatenate([local, self._messages(local)], axis=-1).astype(
+            np.float32
+        )
+        if self._base is not None:
+            # Computed here so step() uses the base command derived from exactly
+            # the observation the policy saw, not from a state one step stale.
+            self._base_command = self._base(self, observation)
+        return observation
 
     def _messages(self, local: np.ndarray) -> np.ndarray:
         mode = self.config.comm_mode

@@ -6,8 +6,6 @@ is fixed in advance rather than chosen after seeing the learned results.
 
 from __future__ import annotations
 
-import numpy as np
-
 from aegis.control.batched_baselines import (
     BatchedLocalFeedback,
     BatchedLQG,
@@ -25,7 +23,10 @@ def main() -> None:
     model = AeroelasticModel(GOLAND_WING)
     flutter = model.flutter_point().airspeed
     speed_range = (flutter * 1.0, flutter * 1.5)
-    print(f"flutter speed {flutter:.1f} m/s; evaluating over {speed_range[0]:.0f}-{speed_range[1]:.0f} m/s\n")
+    print(
+        f"flutter speed {flutter:.1f} m/s; evaluating over "
+        f"{speed_range[0]:.0f}-{speed_range[1]:.0f} m/s\n"
+    )
 
     controllers = {
         "local_fb": BatchedLocalFeedback(),
