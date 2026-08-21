@@ -74,8 +74,8 @@ def main() -> None:
 def _report(profile) -> None:
     print(
         f"  {profile.label:22s} f* = {profile.dominant_hz:5.2f} Hz   "
-        f"phase = {profile.phase_deg.round(1)}   "
-        f"gradient = {profile.phase_gradient():+7.1f} deg/span"
+        f"gradient = {profile.phase_gradient():+7.1f} deg/span   "
+        f"authority = {100 * profile.authority_fraction:5.1f}%"
     )
 
 

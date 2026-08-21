@@ -28,6 +28,14 @@ import numpy as np
 from aegis.envs.batched import BatchedFlutterEnv
 from aegis.envs.flutter_marl import EnvConfig
 
+# Band searched for the dominant structural response. The lower bound excludes
+# quasi-static trim drift; the upper bound sits well below Nyquist and above the
+# highest retained structural mode (about 57 Hz for the Goland wing). Without it
+# the peak search can settle on a bin carrying no real signal -- it reported
+# exactly 100 Hz, the Nyquist frequency, for a policy whose response actually
+# peaked at 3 Hz.
+_SEARCH_BAND_HZ = (1.0, 60.0)
+
 
 @dataclass(frozen=True)
 class PhaseProfile:
@@ -37,6 +45,7 @@ class PhaseProfile:
     gain: np.ndarray            # (n_agents,) rad of deflection per unit modal rate
     phase_deg: np.ndarray       # (n_agents,) degrees, wrapped to (-180, 180]
     dominant_hz: float
+    authority_fraction: float   # RMS deflection as a fraction of available travel
     label: str
 
     def phase_gradient(self) -> float:
@@ -81,12 +90,11 @@ def measure_phase_profile(
         deflections, modal_rate, config.control_dt
     )
     span = np.asarray(
-        [
-            0.5 * (s.y_start_frac + s.y_end_frac)
-            for s in config.wing.surfaces
-        ]
+        [0.5 * (s.y_start_frac + s.y_end_frac) for s in config.wing.surfaces]
     )
-    return PhaseProfile(span, gain, phase, dominant, label)
+    travel = np.asarray([s.max_deflection for s in config.wing.surfaces])
+    authority = float(np.sqrt(np.mean((deflections / travel) ** 2)))
+    return PhaseProfile(span, gain, phase, dominant, authority, label)
 
 
 def _cross_spectrum_phase(
@@ -98,9 +106,12 @@ def _cross_spectrum_phase(
 
     rate_spectrum = np.fft.rfft(modal_rate * window, axis=0)
     power = (np.abs(rate_spectrum) ** 2).sum(axis=1)
-    power[0] = 0.0  # ignore the DC bin, which carries trim rather than motion
-    peak = int(np.argmax(power))
     frequencies = np.fft.rfftfreq(n_steps, dt)
+
+    # Search only where a structural response can physically live.
+    in_band = (frequencies >= _SEARCH_BAND_HZ[0]) & (frequencies <= _SEARCH_BAND_HZ[1])
+    masked = np.where(in_band, power, 0.0)
+    peak = int(np.argmax(masked))
 
     reference = rate_spectrum[peak]  # (n_episodes,)
     gains = np.zeros(deflections.shape[2])
@@ -130,8 +141,13 @@ def plot_phase_profiles(profiles: list[PhaseProfile], path) -> None:
     figure, (top, bottom) = plt.subplots(2, 1, figsize=(5.6, 4.6), sharex=True)
     for index, profile in enumerate(profiles):
         color = controller_color(index)
-        top.plot(profile.span_fraction, profile.phase_deg, "o-", color=color,
-                 label=f"{profile.label}  ({profile.phase_gradient():+.0f}$^\\circ$/span)")
+        top.plot(
+            profile.span_fraction, profile.phase_deg, "o-", color=color,
+            label=(
+                f"{profile.label}  ({profile.phase_gradient():+.0f}$^\\circ$/span, "
+                f"{100 * profile.authority_fraction:.0f}% authority)"
+            ),
+        )
         bottom.plot(profile.span_fraction, profile.gain, "o-", color=color,
                     label=profile.label)
 
