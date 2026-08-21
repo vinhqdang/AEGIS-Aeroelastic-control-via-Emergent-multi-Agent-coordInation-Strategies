@@ -58,6 +58,11 @@ class PPOConfig:
     value_coefficient: float = 0.5
     entropy_coefficient: float = 2.0e-3
     max_grad_norm: float = 0.5
+    # Weight on the auxiliary phasor-regression loss. Zero disables it. The
+    # encoder is asked to reproduce the true modal phasor from local history,
+    # which is the observer the policy otherwise has to discover by trial and
+    # error through the policy gradient alone.
+    aux_coefficient: float = 0.0
     seed: int = 0
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     # Fraction of training over which the task ramps from easy to full. 0
@@ -176,6 +181,12 @@ class PPOTrainer:
                 length, n_envs, self.spec.central_state_dim, device=self.device
             )
 
+        phasor_target = None
+        if self.config.aux_coefficient > 0.0 and self.spec.use_phasor_consensus:
+            phasor_target = torch.zeros(
+                length, n_envs, 2 * self.spec.n_retained_modes, device=self.device
+            )
+
         diverged_count, energy_sum = 0, 0.0
         for step in range(length):
             central_state = self._central_state() if central is not None else None
@@ -185,6 +196,12 @@ class PPOTrainer:
 
             observations[step] = observation
             hiddens[step] = hidden
+            if phasor_target is not None:
+                phasor_target[step] = torch.as_tensor(
+                    self.env.modal_phasor_target(),
+                    device=self.device,
+                    dtype=torch.float32,
+                )
             actions[step] = action
             log_probs[step] = distribution.log_prob(action)
             values[step] = value
@@ -223,6 +240,7 @@ class PPOTrainer:
             "returns": returns,
             "dones": dones,
             "central": central,
+            "phasor_target": phasor_target,
             "divergence_rate": diverged_count / (length * n_envs),
             "mean_energy": energy_sum / length,
         }
@@ -303,7 +321,7 @@ class PPOTrainer:
         # Detached hidden state at the segment start: truncated BPTT.
         hidden = batch["hiddens"][starts, envs].detach()
 
-        log_probs, values, entropy_terms = [], [], []
+        log_probs, values, entropy_terms, aux_terms = [], [], [], []
         for offset in range(segment):
             time_index = starts + offset
             observation = batch["observations"][time_index, envs]
@@ -317,6 +335,10 @@ class PPOTrainer:
             log_probs.append(distribution.log_prob(batch["actions"][time_index, envs]))
             values.append(value)
             entropy_terms.append(distribution.entropy())
+            if batch["phasor_target"] is not None:
+                estimate = self.policy.encode(observation, hidden)
+                target = batch["phasor_target"][time_index, envs].unsqueeze(1)
+                aux_terms.append((estimate - target).pow(2).mean())
             # Zero the recurrent state where an episode ended inside the segment.
             alive = (1.0 - batch["dones"][time_index, envs]).view(-1, 1, 1)
             hidden = next_hidden * alive
@@ -340,10 +362,16 @@ class PPOTrainer:
         policy_loss = -torch.min(unclipped, clipped).mean()
         value_loss = (value - target).pow(2).mean()
 
+        aux_loss = (
+            torch.stack(aux_terms).mean()
+            if aux_terms
+            else torch.zeros((), device=self.device)
+        )
         loss = (
             policy_loss
             + config.value_coefficient * value_loss
             - config.entropy_coefficient * entropy
+            + config.aux_coefficient * aux_loss
         )
         self.optimizer.zero_grad(set_to_none=True)
         loss.backward()

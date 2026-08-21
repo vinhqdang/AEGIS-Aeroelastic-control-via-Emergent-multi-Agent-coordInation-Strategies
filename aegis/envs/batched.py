@@ -444,6 +444,23 @@ class BatchedFlutterEnv:
         oracle = np.stack([amplitude, rate], axis=-1)
         return np.tile(oracle[:, None, :], (1, self.n_agents, 1))
 
+    def modal_phasor_target(self) -> np.ndarray:
+        """Normalised state of the retained modes, shape (n_envs, 4).
+
+        The supervision target for the phasor encoder: the first bending and
+        first torsion amplitudes and rates, scaled to roughly unit magnitude and
+        squashed so the range matches the encoder output.
+        """
+        bending = self._plant[:, 0] / self.config.reference_tip_plunge
+        bending_rate = self._plant[:, self.n_modes] / self.scales.velocity
+        twist_index = self.config.wing.n_bending
+        torsion = self._plant[:, twist_index] / max(self.scales.twist, 1e-9)
+        torsion_rate = self._plant[:, self.n_modes + twist_index] / max(
+            self.scales.twist_rate, 1e-9
+        )
+        stacked = np.stack([bending, bending_rate, torsion, torsion_rate], axis=-1)
+        return np.tanh(stacked)
+
     # --------------------------------------------------------------- rewards
     def _structural_energy(self) -> np.ndarray:
         position = self._plant[:, : self.n_modes]

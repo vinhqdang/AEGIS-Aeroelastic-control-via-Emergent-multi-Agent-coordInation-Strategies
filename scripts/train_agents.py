@@ -63,6 +63,7 @@ class Variant:
     base_controller: str = "none"
     residual_authority: float = 1.0
     use_health_channel: bool = False
+    aux_coefficient: float = 0.0
 
 
 VARIANTS: dict[str, Variant] = {
@@ -102,6 +103,16 @@ VARIANTS: dict[str, Variant] = {
     "mocca_nohead": Variant(
         "mocca_nohead", "blended", "none", True, False, False,
         "phasor consensus, raw action head",
+    ),
+    "aux_encoder": Variant(
+        "aux_encoder", "blended", "none", True, False, False,
+        "phasor encoder supervised on the true modal phasor, raw action head",
+        aux_coefficient=1.0,
+    ),
+    "aux_residual": Variant(
+        "aux_residual", "blended", "none", True, False, False,
+        "supervised phasor encoder correcting a decentralised LQG base law",
+        base_controller="dlqg", residual_authority=0.3, aux_coefficient=1.0,
     ),
     "mocca": Variant(
         "mocca", "blended", "none", True, True, False,
@@ -180,6 +191,7 @@ def _run_one(variant: Variant, seed: int, args, outdir: Path) -> None:
             total_steps=args.steps,
             n_envs=args.n_envs,
             rollout_length=args.rollout,
+            aux_coefficient=variant.aux_coefficient,
             seed=seed,
         ),
     )

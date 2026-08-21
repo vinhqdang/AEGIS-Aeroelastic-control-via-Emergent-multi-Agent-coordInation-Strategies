@@ -263,6 +263,24 @@ class MultiAgentPolicy(nn.Module):
             next_hidden,
         )
 
+    def encode(
+        self, observation: torch.Tensor, hidden: torch.Tensor
+    ) -> torch.Tensor:
+        """Pre-consensus phasor estimate per agent, for the auxiliary loss.
+
+        Deliberately the *pre*-consensus value: the supervision target is what
+        each agent should infer from its own history, and supervising after the
+        averaging would let an agent score well by free-riding on neighbours.
+        """
+        if self.encoder is None:
+            raise RuntimeError("policy has no phasor encoder to supervise")
+        batch, n_agents, _ = observation.shape
+        message, _ = self.encoder(
+            observation.reshape(batch * n_agents, -1),
+            hidden.reshape(batch * n_agents, -1),
+        )
+        return message.reshape(batch, n_agents, -1)
+
     def forward(
         self,
         observation: torch.Tensor,
