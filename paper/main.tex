@@ -215,6 +215,51 @@ Static divergence speed  & \SI{356.8}{\metre\per\second} ($2.60\,\Uf$) & --- \\
 \end{tabular}
 \end{table}
 
+\subsection{Cross-validation against an unsteady vortex-lattice solver}
+\label{sec:sharpy}
+
+The plant above buys speed with two approximations that a reviewer is entitled to
+distrust: two-dimensional strip aerodynamics, and quasi-steady flap derivatives
+that neglect the flap's own shed wake. We quantified both against SHARPy
+\cite{delcarre2019sharpy}, which couples an unsteady vortex-lattice method to a
+geometrically exact beam.
+
+The comparison is unusually clean because SHARPy's own Goland template carries
+structural data identical to ours -- $GJ=\SI{0.987581e6}{\newton\metre\squared}$,
+$EI=\SI{9.77221e6}{\newton\metre\squared}$, $m=\SI{35.71}{\kilo\gram\per\metre}$,
+$J=\SI{8.64}{\kilo\gram\metre}$, elastic axis at \SI{33}{\percent} and centre of
+gravity at \SI{43}{\percent} chord. Any disagreement is therefore a disagreement
+about the aerodynamics.
+
+\paragraph{Flutter point.} At sea level SHARPy places flutter at
+\SI{154.46}{\metre\per\second} and \SI{69.3}{\radian\per\second}, against
+\SI{137.35}{\metre\per\second} and \SI{69.34}{\radian\per\second} for our model.
+The \emph{frequency} agrees to \SI{0.06}{\percent}, so both models identify the
+same bending--torsion coalescence; only the critical speed differs, by
+\SI{-11.1}{\percent}. The direction is the one two-dimensional aerodynamics
+predicts: strip theory has no tip relief, over-predicts loading near the tip and
+therefore under-predicts the flutter speed. Our plant is thus conservative, which
+is the safe direction for a control study -- the policies were trained against a
+harder problem than reality.
+
+\paragraph{Control authority.} This one goes the other way and is larger. A
+part-span flap loses effectiveness to spanwise carryover and to the flow around
+its ends, neither of which a sectional derivative can represent. Integrating our
+thin-airfoil $C_{l\delta}=3.826$ per radian over the flapped span (\SI{25}{\percent}
+of span, read from the generated aerodynamic grid) gives a whole-wing
+$\mathrm{d}C_L/\mathrm{d}\delta$ of $0.957$ per radian, against $0.495$ from
+UVLM on the finer of two grids. Our plant therefore over-estimates control
+authority by a factor of $1.9$, grid-converged to within \SI{3}{\percent}
+between $M{\times}N = 8{\times}16$ and $16{\times}32$.
+
+\paragraph{What this does and does not invalidate.} Every controller in this
+study, classical and learned, was evaluated on the same plant and so received the
+same inflated authority. Relative comparisons, ablations and significance tests
+are therefore unaffected. Absolute decay rates would not transfer unchanged to a
+UVLM plant, and we do not claim they would. The two discrepancies also act in
+opposite directions -- a harder flutter problem, an easier control problem -- so
+they cannot be folded into a single safety factor, and we report them separately.
+
 \subsection{Distributed control problem}
 
 Three trailing-edge surfaces occupy spanwise bands at $[0.05,0.40]$,
@@ -503,10 +548,10 @@ trade-off rather than the better half of it.
 \item The credit signal requires the modal control influence $v_r^{\top} b_k$.
 This is free in simulation but on hardware needs a modal model, and robustness to
 error in $B$ is untested.
-\item Quasi-steady flap aerodynamics neglect the flap's own wake shedding, which
-over-estimates control authority at high frequency. Re-validating on a
-higher-fidelity unsteady vortex-lattice model such as SHARPy
-\cite{delcarre2019sharpy} has not been done.
+\item The plant over-estimates control authority by a factor of $1.9$ relative to
+UVLM (Section~\ref{sec:sharpy}). Relative results are unaffected, since every
+controller faced the same plant, but absolute decay rates would not transfer. We
+have not retrained or re-evaluated policies on the UVLM plant itself.
 \item Proposition~\ref{prop:diff} concerns the difference reward, not optimality
 of the resulting policy.
 \item Ablations use six seeds for the credit comparison and three for the
