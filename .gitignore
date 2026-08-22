@@ -228,3 +228,7 @@ paper/*.log
 paper/*.bbl
 paper/*.blg
 paper/*.out
+sharpy/uvlm_cases/
+sharpy/flap_cases/
+sharpy/cases/
+sharpy/*.json
