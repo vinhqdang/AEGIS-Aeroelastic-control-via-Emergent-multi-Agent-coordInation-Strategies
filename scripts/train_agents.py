@@ -244,6 +244,10 @@ def _run_one(variant: Variant, seed: int, args, outdir: Path) -> None:
         "variant": asdict(variant),
         "seed": seed,
         "steps": args.steps,
+        # Recorded so analyses do not have to infer the exploration scale from
+        # the output directory. It turned out to be the dominant hyperparameter.
+        "initial_sigma": float(np.exp(args.log_std)),
+        "entropy_coefficient": args.entropy,
         "train_seconds": elapsed,
         "log": log.as_dict(),
         "results": [
