@@ -62,15 +62,21 @@ def main() -> None:
 
 def _collect(root: Path) -> dict[float, list[float]]:
     points: dict[float, list[float]] = {}
-    for directory, sigma in SIGMA_BY_DIRECTORY.items():
+    for directory, table_sigma in SIGMA_BY_DIRECTORY.items():
         for path in sorted((root / directory).glob(f"{VARIANT}_s*.json")):
+            sigma = table_sigma
             payload = json.loads(path.read_text(encoding="utf-8"))
+            # Prefer the value the run recorded; the table is only a fallback
+            # for runs that predate recording it. Disagree by more than a few
+            # per cent and the mapping is wrong, which is worth stopping for.
             recorded = payload.get("initial_sigma")
-            if recorded is not None and abs(recorded - sigma) > 1e-6:
-                raise SystemExit(
-                    f"{path} was trained at sigma {recorded}, not the {sigma} "
-                    "this table assumes"
-                )
+            if recorded is not None:
+                if abs(recorded - sigma) / sigma > 0.05:
+                    raise SystemExit(
+                        f"{path} was trained at sigma {recorded:.4f}, but the "
+                        f"directory table says {sigma}"
+                    )
+                sigma = round(recorded, 4)
             healthy = [
                 r["suppression_rate"]
                 for r in payload["results"]
@@ -90,43 +96,44 @@ def _plot(points: dict[float, list[float]], path: Path) -> None:
     from aegis.viz.paper import INK_MUTED, controller_color, use_paper_style
 
     use_paper_style()
-    figure, axes = plt.subplots(figsize=(5.8, 3.6))
+    figure, axes = plt.subplots(figsize=(5.8, 3.7))
 
     sigmas = np.asarray(sorted(points))
     means = np.asarray([np.mean(points[s]) for s in sigmas])
     spread = np.asarray([np.std(points[s]) for s in sigmas])
 
-    axes.axhline(
-        BASELINE_CENTRALISED, color=INK_MUTED, lw=1.0, ls="--",
-    )
-    axes.text(
-        sigmas.max(), BASELINE_CENTRALISED, " centralised LQG", va="center",
-        ha="right", color=INK_MUTED, fontsize=7.5,
-    )
+    # More negative is better, so the axis is inverted: up is better, which is
+    # what a reader assumes without being told.
+    axes.invert_yaxis()
+
     axes.axhline(BASELINE_DECENTRALISED, color=INK_MUTED, lw=1.0, ls=":")
     axes.text(
-        sigmas.max(), BASELINE_DECENTRALISED, " decentralised LQG", va="bottom",
-        ha="right", color=INK_MUTED, fontsize=7.5,
+        sigmas.min(), BASELINE_DECENTRALISED, "decentralised LQG (same information structure)",
+        va="bottom", ha="left", color=INK_MUTED, fontsize=7.5,
     )
 
-    axes.axvline(USEFUL_AMPLITUDE, color="#b03a2e", lw=1.0, ls="-", alpha=0.7)
+    axes.axvline(USEFUL_AMPLITUDE, color="#b03a2e", lw=1.0, alpha=0.75)
     axes.text(
-        USEFUL_AMPLITUDE * 1.15, means.max(), "amplitude the\nclassical controller uses",
-        color="#b03a2e", fontsize=7.5, va="top",
+        USEFUL_AMPLITUDE * 1.18, means.min(),
+        "deflection amplitude the\nclassical controller uses",
+        color="#b03a2e", fontsize=7.5, va="bottom",
     )
 
     axes.errorbar(
         sigmas, means, yerr=spread, fmt="o-", color=controller_color(3),
-        capsize=3, lw=1.6, label=f"{VARIANT} (2 seeds)",
+        capsize=3, lw=1.7, label="learned policy, mean of 2 seeds",
     )
     axes.set_xscale("log")
+    axes.set_xlim(USEFUL_AMPLITUDE * 0.8, sigmas.max() * 1.5)
+    axes.set_ylim(-0.4, BASELINE_DECENTRALISED - 0.25)
     axes.set_xlabel("initial exploration $\\sigma$  [normalised action units]")
-    axes.set_ylabel("energy decay rate  [1/s]")
+    axes.set_ylabel("energy decay rate  [1/s]\nbetter $\\longrightarrow$")
     axes.set_title(
-        "Performance is set by exploration scale, not by the learning algorithm",
+        "Performance is set by the exploration scale, "
+        "not by the credit signal or the architecture",
         loc="left",
     )
-    axes.legend(loc="lower right")
+    axes.legend(loc="lower left", fontsize=7.5)
     figure.savefig(path)
     plt.close(figure)
 
