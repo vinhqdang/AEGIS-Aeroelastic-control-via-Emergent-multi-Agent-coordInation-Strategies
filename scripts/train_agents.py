@@ -152,7 +152,7 @@ def main() -> None:
             raise SystemExit(f"unknown preset {name!r}; choose from {list(VARIANTS)} or 'all'")
 
     for name in names:
-        for seed in range(args.seeds):
+        for seed in range(args.seed_offset, args.seed_offset + args.seeds):
             _run_one(VARIANTS[name], seed, args, outdir)
 
 
@@ -277,6 +277,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--preset", default="mocca", help="variant name, comma list, or 'all'")
     parser.add_argument("--steps", type=int, default=1_000_000)
     parser.add_argument("--seeds", type=int, default=1)
+    parser.add_argument(
+        "--seed-offset", type=int, default=0,
+        help="first seed index, so extra seeds can be added without redoing runs",
+    )
     parser.add_argument("--n-envs", type=int, default=128)
     parser.add_argument("--rollout", type=int, default=128)
     parser.add_argument("--eval-episodes", type=int, default=32)
