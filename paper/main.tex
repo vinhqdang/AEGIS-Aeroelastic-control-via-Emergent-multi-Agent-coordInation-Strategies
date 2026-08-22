@@ -22,8 +22,10 @@
 % Numeric results are defined once here and injected from paper/results.json by
 % scripts/fill_numbers.py, so no number is transcribed by hand into the prose.
 \input{numbers}
+\input{narrative}
 
-\title{Physics-Exact Credit Assignment for Distributed Flutter Suppression}
+\title{Physics-Exact Credit Assignment for Distributed Flutter Suppression,\\
+and the Exploration Scale That Hides It}
 
 \author{%
   \textbf{[AUTHOR NAMES AND AFFILIATIONS TO BE COMPLETED]}\\
@@ -123,10 +125,17 @@ counterfactuals, together with the observation that the credit signal must be th
 \item \textsc{MoCCA}, a distributed policy architecture combining that credit
 signal with a fixed-bandwidth modal-phasor consensus channel and a phase-locked
 action parameterisation.
-\item A validated aeroelastic testbed and a four-rung classical baseline ladder
+\item A validated aeroelastic testbed and a five-rung classical baseline ladder
 that separates the effect of the control method from the effect of the
 information structure available to it, plus a feasibility oracle that identifies
 test conditions no controller can hold.
+\item A negative result we consider as informative as the positive one: the
+communication and action-parameterisation mechanisms we derived from the same
+physics do not help, and a plain feedforward policy with the same credit signal
+significantly outperforms all of them.
+\item The observation that the exploration scale, not the learning algorithm,
+sets performance on this problem, and that it hides both results above until it
+is matched to the actuation amplitude that damps the wing.
 \end{itemize}
 
 \section{Related work}
@@ -354,7 +363,15 @@ and RMS deflection.
 
 \section{Results}
 
+\begin{table}[t]
+\centering
+\caption{Energy decay rate by controller and flight condition. Negative is
+suppressed, \texttt{D} marks the fraction of episodes that diverged, and
+\texttt{--} marks conditions infeasible for any controller with these actuators.}
+\label{tab:main}
+\footnotesize
 \input{results_table}
+\end{table}
 
 \begin{figure}[t]
 \centering
@@ -443,26 +460,61 @@ shape; a flat profile is purely local reaction.}
 
 \ResultsAblations
 
+\begin{table}[t]
+\centering
+\caption{Credit-assignment ablation at $\sigma=0.05$, six seeds per variant.}
+\label{tab:ablation-credit}
+\small
+\input{ablation_credit}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Architecture ablation at $\sigma=0.05$, three seeds per variant. Every
+mechanism we proposed degrades performance relative to a plain policy with the
+same credit signal.}
+\label{tab:ablation-arch}
+\small
+\input{ablation_arch}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/fig_exploration.pdf}
+\caption{Energy decay rate against initial exploration standard deviation, all
+else held fixed. The red line marks the deflection amplitude the classical
+controller actually uses. Two seeds per point.}
+\label{fig:exploration}
+\end{figure}
+
 \section{Limitations}
 
 We state these plainly.
 
 \begin{itemize}
+\item The learned policies do not match the decentralised classical controller
+on average nominal damping ($-1.53$ against $-2.05$ per second). They are more
+uniform across the envelope and hold a condition where it diverges, but we do not
+claim they dominate it.
+\item The robustness result is scale-dependent. At $\sigma=0.30$ the learned
+policies held all six feasible conditions, matching a fault-aware oracle; at
+$\sigma=0.05$, where damping is three times better, they hold five. We report the
+trade-off rather than the better half of it.
 \item The credit signal requires the modal control influence $v_r^{\top} b_k$.
-This is free in simulation but on hardware needs a modal model; robustness to
-error in $B$ is an open item.
+This is free in simulation but on hardware needs a modal model, and robustness to
+error in $B$ is untested.
 \item Quasi-steady flap aerodynamics neglect the flap's own wake shedding, which
-over-estimates control authority at high frequency. Re-validating a trained policy
-on a higher-fidelity unsteady vortex-lattice model such as SHARPy
-\cite{delcarre2019sharpy} is the natural next step and has not been done here.
-\item Proposition~\ref{prop:diff} concerns the difference reward, not optimality of
-the resulting policy; the sufficiency of the phasor channel is a truncation
-argument, not an equivalence, and we do not claim otherwise.
-\item Results are on a three-surface wing with two seeds per variant. The
-scaling claim implied by the fixed-bandwidth channel is untested beyond three
-agents.
-\item ``Emergent'' coordination is used here only in the operational sense of a
-spanwise phase pattern that was not specified in advance.
+over-estimates control authority at high frequency. Re-validating on a
+higher-fidelity unsteady vortex-lattice model such as SHARPy
+\cite{delcarre2019sharpy} has not been done.
+\item Proposition~\ref{prop:diff} concerns the difference reward, not optimality
+of the resulting policy.
+\item Ablations use six seeds for the credit comparison and three for the
+architecture comparison, on a three-surface wing. The eight-surface results are
+suggestive but were not run to the same statistical standard.
+\item The exploration-scale finding is established on this plant and this
+algorithm. We expect it to generalise to control tasks whose useful actuation
+band is narrow relative to the action range, but we have not shown that.
 \end{itemize}
 
 \section{Conclusion}

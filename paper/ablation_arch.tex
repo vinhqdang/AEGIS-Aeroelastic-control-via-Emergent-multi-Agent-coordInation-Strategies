@@ -1,0 +1,25 @@
+\begin{tabular}{lrrr}
+\toprule
+Variant & Seeds & Decay rate [1/s] & Conditions held \\
+\midrule
+\texttt{comm\_raw} & 3 & $-0.583 \pm 0.310$ & 5.0/9 \\
+\texttt{mocca} & 3 & $-0.561 \pm 0.145$ & 4.3/9 \\
+\texttt{mocca\_nohead} & 3 & $-0.279 \pm 0.143$ & 5.0/9 \\
+\texttt{recurrent\_only} & 3 & $-0.487 \pm 0.374$ & 5.0/9 \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.5em}
+
+\begin{tabular}{llrr}
+\toprule
+Comparison & & Cohen's $d$ & $p$ \\
+\midrule
+\texttt{comm\_raw} & vs \texttt{mocca} & $-0.09$ & $0.9210$ \\
+\texttt{comm\_raw} & vs \texttt{mocca\_nohead} & $-1.26$ & $0.2267$ \\
+\texttt{comm\_raw} & vs \texttt{recurrent\_only} & $-0.28$ & $0.7520$ \\
+\texttt{mocca} & vs \texttt{mocca\_nohead} & $-1.96$ & $0.0742$ \\
+\texttt{mocca} & vs \texttt{recurrent\_only} & $-0.26$ & $0.7739$ \\
+\texttt{mocca\_nohead} & vs \texttt{recurrent\_only} & $0.74$ & $0.4440$ \\
+\bottomrule
+\end{tabular}

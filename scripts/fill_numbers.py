@@ -1,13 +1,11 @@
 """Generate ``paper/numbers.tex`` from ``paper/results.json``.
 
+Numeric macros only. The narrative macros live in ``paper/narrative.tex`` and are
+written by hand.
+
 Every number that appears in the manuscript comes from here, so no figure in the
 prose is transcribed by hand. If a number in the paper disagrees with the
 experiments, that is a bug in this file rather than a typo somewhere in the text.
-
-The narrative macros are emitted as stubs on the first run and are meant to be
-written by hand once the results are known -- prose that argues a direction
-should not be generated from a template, because the direction is exactly what
-the experiment decides.
 
 Usage::
 
@@ -19,14 +17,6 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-
-NARRATIVE_MACROS = (
-    "ResultsSummarySentence",
-    "ResultsNarrative",
-    "ResultsAblations",
-    "PhaseNarrative",
-    "ConclusionSentence",
-)
 
 
 def main() -> None:
@@ -67,10 +57,10 @@ def main() -> None:
             _macro("BestNominalHealthy", f"{best_nominal['healthy_suppression']:.2f}"),
         ]
 
-    existing = _existing_narrative(output)
-    for macro in NARRATIVE_MACROS:
-        body = existing.get(macro, f"\\emph{{[{macro}: to be written]}}")
-        lines.append(_macro(macro, body))
+    # Narrative macros deliberately live in paper/narrative.tex and are written
+    # by hand. Prose that argues a direction must not come from a template when
+    # the direction is exactly what the experiments decide -- this study reversed
+    # it three times before the measurements were trustworthy.
 
     output.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {output} with {len(lines) - 1} macros")
@@ -83,21 +73,6 @@ def main() -> None:
             f"stabilised {controller['stabilised']}/{controller['feasible_cells']}"
             f"   healthy {text}"
         )
-
-
-def _existing_narrative(path: Path) -> dict[str, str]:
-    """Preserve hand-written narrative macros across regeneration."""
-    if not path.exists():
-        return {}
-    kept = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        for macro in NARRATIVE_MACROS:
-            prefix = f"\\newcommand{{\\{macro}}}{{"
-            if line.startswith(prefix) and line.rstrip().endswith("}"):
-                body = line[len(prefix) : line.rstrip().rfind("}")]
-                if "to be written" not in body:
-                    kept[macro] = body
-    return kept
 
 
 def _macro(name: str, body: str) -> str:
