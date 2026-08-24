@@ -83,45 +83,70 @@ learning \sep credit assignment \sep decentralised control \sep exploration
 Flutter is a self-excited aeroelastic instability in which structural bending and
 torsion couple through unsteady aerodynamic loads and draw energy from the
 freestream. Past a critical speed the coupled mode becomes unstable and the
-response grows without bound. Because it is a dynamic instability rather than a
-static one, it can in principle be pushed back by active control, and active
-flutter suppression has a long engineering history built on linear-quadratic and
-robust synthesis \citep{karpel1982design,waszak2001robust,livne2018flutter,
-mukhopadhyay2003historical}.
+response grows without bound, typically within a few oscillation cycles and with
+no warning a pilot can act on. It has been a design driver since the earliest
+flexible aircraft and remains one: because a wing must be certified against
+flutter with a substantial speed margin, the mass, stiffness and manufacturing
+cost of the structure are set in large part by an instability the aircraft is
+never meant to encounter in service \citep{livne2018flutter,
+mukhopadhyay2003historical}. Active suppression offers a way to buy back some of
+that margin with control effort rather than with structural weight, which is why
+it has attracted sustained engineering attention since the 1970s
+\citep{karpel1982design,waszak2001robust,block1998applied}.
 
-Two trends motivate revisiting the problem. Wings are becoming more flexible and
-carry more independently actuated trailing-edge surfaces, each with local sensing
-and local computation on a bus rather than a wire to a central controller. And
-reinforcement learning has been applied to flutter control with encouraging
-results, though to our knowledge always with a single agent commanding a single
-effector: circulation control \citep{circulation2023}, camber morphing
-\citep{stallflutter2025}, or tuning the parameters of a conventional controller
-\citep{flyingwing2022}.
+Two trends motivate revisiting the problem now. First, wings are becoming more
+flexible --- for fuel efficiency, span, and load alleviation --- and flexible
+wings carry more independently actuated trailing-edge surfaces, each with its own
+local sensing and local computation on a bus rather than a dedicated wire to a
+central controller. The hardware is already distributed even where the control
+law is not. Second, reinforcement learning has been applied to flutter
+suppression with encouraging results: circulation control validated in a wind
+tunnel \citep{circulation2023}, camber morphing for stall flutter
+\citep{stallflutter2025}, and tuning the parameters of a conventional controller
+\citep{flyingwing2022}. Every instance we are aware of, however, uses a single
+agent commanding a single effector from a global observation. Taking the
+hardware trend seriously means asking what happens when the effectors are
+commanded by separate agents that cannot see the whole wing, which is the
+question this paper answers on a specific, validated testbed
+(Figure~\ref{fig:schematic}).
 
 Posing the problem with one agent per surface makes credit assignment the central
-difficulty. Every surface acts on the same coupled mode, so a shared reward says
-little about who contributed what, and the standard remedies estimate the
-decomposition from returns \citep{sunehag2018vdn,rashid2018qmix,foerster2018coma}.
-Our first observation is that this particular plant does not require estimation:
-the decomposition is available analytically.
+difficulty, and for a physical reason rather than an algorithmic one: every
+surface acts on the \emph{same} coupled bending--torsion mode, so a reward built
+from the whole wing's response says almost nothing about which surface actually
+helped. The standard remedies in multi-agent reinforcement learning estimate that
+decomposition statistically, from the returns a policy happens to collect
+\citep{sunehag2018vdn,rashid2018qmix,foerster2018coma}. Our first observation is
+that this particular class of plant does not require estimation at all: for a
+structural system whose energy budget is exactly additive across control inputs,
+the credit decomposition is available in closed form from the equations of
+motion themselves, with no learning involved in computing it.
 
 Our second observation is the one we would most want a practitioner to take away,
-and we did not anticipate it. Before finding it, we spent several rounds
-comparing credit signals, communication schemes, action parameterisations,
-recurrence and auxiliary losses, and every variant plateaued in the same narrow
-band. That invariance was not evidence that the mechanisms were equivalent; it
-was evidence that something upstream of all of them was binding. The exploration
-standard deviation was roughly forty times the deflection amplitude that actually
-damps this wing, so the policy never experienced the actuation that works. Fixing
-it changed performance more than any algorithmic choice we made, and only then
-did the credit-assignment effect become measurable at all.
+and we did not anticipate it going in. Before finding it, we spent several
+rounds comparing credit signals, communication schemes, action
+parameterisations, recurrence and auxiliary losses --- the ordinary methodology
+of an ablation study --- and every variant plateaued in the same narrow
+performance band regardless of which mechanism it used. That invariance was not
+evidence that the mechanisms were equivalent to one another; on closer
+inspection it was evidence that something \emph{upstream} of all of them was
+binding. The exploration standard deviation of the policy was roughly forty
+times the deflection amplitude that actually damps this wing, so no policy ever
+experienced the fine, precisely-phased actuation that works, and no credit
+signal --- however well constructed --- could assign credit to a signal buried
+that far under noise. Matching the exploration scale to the useful actuation
+amplitude changed performance by a factor of two, more than any single
+algorithmic choice we tried, and only after that correction did the
+credit-assignment effect we had set out to study become measurable at all.
 
-This is a known failure mode in spirit --- the reinforcement learning literature
-has repeatedly found implementation and hyperparameter choices dominating
-algorithmic ones \citep{henderson2018matters,engstrom2020implementation,
-andrychowicz2021what} --- but we can give it a physical diagnostic here, because
-the useful actuation amplitude is something a control engineer can compute from a
-classical design before training anything.
+This is a known failure mode in spirit: the reinforcement learning literature has
+repeatedly found implementation and hyperparameter choices dominating
+algorithmic ones in general-purpose control benchmarks
+\citep{henderson2018matters,engstrom2020implementation,andrychowicz2021what}. Our
+contribution is a control-specific instance of that caution, with a diagnostic a
+practitioner can use \emph{before} training anything: the useful actuation
+amplitude is computable from a classical design, and the exploration scale can be
+checked against it in advance rather than discovered by trial and error.
 
 \paragraph{Contributions}
 \begin{enumerate}
@@ -148,63 +173,100 @@ parameterisation mechanisms we derived from the physics do not help.
 \label{sec:related}
 
 \paragraph{Active flutter suppression}
-Classical treatments synthesise a centralised regulator from a state-space
-aeroelastic model \citep{karpel1982design}, with robust multivariable designs
-demonstrated on wind-tunnel models \citep{waszak2001robust} and nonlinear
-extensions for aeroelastic structures \citep{block1998applied}. Livne
-\citep{livne2018flutter} surveys the state of the art and the maturation gaps.
-The unsteady aerodynamic models used here descend from Theodorsen
-\citep{theodorsen1935} and the indicial formulation of Jones
-\citep{jones1940}, with finite-state induced-flow models
-\citep{peters1995finite} the modern sectional alternative; standard texts are
-\citep{fung1955,bisplinghoff1955,palacios2023flexible}.
+The classical approach synthesises a single centralised regulator from a
+state-space aeroelastic model, driving all control surfaces from one observer
+and one gain \citep{karpel1982design}. Robust multivariable designs following
+that template have been demonstrated on wind-tunnel models
+\citep{waszak2001robust}, and the approach extends to nonlinear aeroelastic
+structures with limit-cycle behaviour \citep{block1998applied}; Livne
+\citep{livne2018flutter} surveys the state of the art and the gap between
+laboratory demonstrations and certified hardware, and Mukhopadhyay
+\citep{mukhopadhyay2003historical} traces the field's history. What none of
+these treatments questions is the centralised structure itself: the regulator
+sees the whole state and commands every surface jointly, which is exactly the
+assumption a physically distributed set of actuators need not satisfy. The
+unsteady aerodynamic models underlying both the classical literature and our own
+plant descend from Theodorsen's frequency-domain analysis
+\citep{theodorsen1935} and the indicial (Wagner-function) formulation of Jones
+\citep{jones1940}; finite-state induced-flow models
+\citep{peters1995finite} are the modern sectional alternative, and
+\citep{fung1955,bisplinghoff1955,palacios2023flexible} are the standard texts we
+draw the modelling conventions from.
 
 \paragraph{Learning for flutter control}
-Recent work applies deep reinforcement learning to stall flutter via camber
-morphing \citep{stallflutter2025}, to flutter suppression by trailing-edge
-circulation control validated in a wind tunnel \citep{circulation2023}, and to
-tuning aeroservoelastic controller parameters \citep{flyingwing2022}. All are
-single-agent with a global observation. We are not aware of prior work treating
-the individual control surfaces as separate learning agents.
+A recent line of work applies deep reinforcement learning directly to flutter
+suppression: stall flutter via active camber morphing
+\citep{stallflutter2025}, trailing-edge circulation control validated in a wind
+tunnel \citep{circulation2023}, and tuning the parameters of a conventional
+aeroservoelastic controller \citep{flyingwing2022}. Despite using different
+effectors and different plants, all three share the same structural assumption
+as the classical literature they replace a hand-designed gain in: one learning
+agent, one effector, one global observation. We are not aware of prior work that
+treats the individual control surfaces of a single wing as separate learning
+agents, which is the gap this paper occupies.
 
 \paragraph{Decentralised control}
-That decentralisation costs performance is classical
+That decentralisation costs closed-loop performance relative to a centralised
+design with the same model is a classical result, not a symptom of using
+learning
 \citep{siljak1991decentralized,bakule2008decentralized}, and the structural
-conditions under which decentralised synthesis remains tractable are
-characterised in \citep{rotkowitz2006characterization}. This matters for our
-experimental design: comparing a distributed learned policy against a centralised
-regulator confounds the control method with the information available to it, so
-we include a fully decentralised LQG as the like-for-like reference.
+conditions under which decentralised synthesis remains \emph{tractable} at all
+are characterised by Rotkowitz and Lall \citep{rotkowitz2006characterization}.
+This literature is why we treat the information structure as an experimental
+variable rather than an afterthought: comparing a distributed learned policy
+against a centralised regulator conflates the control method with the
+information available to it, and the honest classical baseline for a policy that
+sees only local accelerometers is a fully decentralised LQG built from the same
+sensing, not the centralised design that the learned policy could never in
+principle match.
 
 \paragraph{Multi-agent credit assignment}
-The standard tools are difference rewards \citep{wolpert2002difference} and value
-factorisation \citep{sunehag2018vdn,rashid2018qmix}, with COMA
-\citep{foerster2018coma} using a counterfactual advantage baseline; MADDPG
+The standard tools for the credit-assignment problem we pose are difference
+rewards \citep{wolpert2002difference} and learned value factorisation
+\citep{sunehag2018vdn,rashid2018qmix}, with COMA \citep{foerster2018coma} using a
+counterfactual advantage baseline to the same end; MADDPG
 \citep{lowe2017maddpg} and MAPPO \citep{yu2022mappo} are the common actor-critic
-baselines, and the field is surveyed in
-\citep{albrecht2023survey,scalingmarl2025} with continuing work on sharper
-estimators \citep{multilevelcredit2025}. These methods are general because they
-assume nothing about the environment; our point is complementary and narrower.
-The formal setting is the decentralised POMDP
-\citep{bernstein2002complexity,oliehoek2016concise}.
+baselines built on top of these ideas, the field more broadly is surveyed in
+\citep{albrecht2023survey,scalingmarl2025}, and estimators continue to be
+refined \citep{multilevelcredit2025}. All of these methods are general
+\emph{because} they assume nothing about the environment and therefore have to
+estimate the decomposition from experience. Our contribution is narrower and
+complementary rather than competing with this literature: for the specific class
+of energy-conserving structural plant studied here, the decomposition these
+methods estimate is available in closed form, so none of the machinery built to
+estimate it is needed. The formal setting for the distributed problem itself is
+the decentralised POMDP \citep{bernstein2002complexity,oliehoek2016concise}.
 
 \paragraph{Learned communication}
 CommNet \citep{sukhbaatar2016commnet} and TarMAC \citep{das2019tarmac} learn
-message content end to end. We instead fixed the message \emph{space} to a modal
-phasor, which would have made the channel interpretable and bounded its width
-independently of agent count. It did not help, and we report that.
+message content end to end from a broad channel. We took the opposite design
+choice and fixed the message \emph{space} to a modal phasor derived from the
+physics, on the reasoning that this would make the channel interpretable and
+bound its bandwidth independently of the number of agents. Measured against a
+plain policy with no channel at all, it did not help on this plant
+(Section~\ref{sec:ablations}), and we report the negative result rather than
+omit the mechanism.
 
 \paragraph{Reinforcement learning practice}
-Our central caution has precedent. Henderson et al.\ \citep{henderson2018matters}
-documented how seed variance can swamp algorithmic differences; Engstrom et al.\
-\citep{engstrom2020implementation} showed implementation details accounting for
-claimed gains; Andrychowicz et al.\ \citep{andrychowicz2021what} found
-hyperparameters dominating design choices at scale; and Agarwal et al.\
-\citep{agarwal2021precipice} argued for statistical rigour with few runs. We add
-a control-specific instance in which the binding hyperparameter can be predicted
-from the plant. Residual formulations, in which a policy corrects a classical
-controller \citep{johannink2019residual,silver2018residual}, appear here as one
-of the variants studied.
+Our central caution has direct precedent in general-purpose reinforcement
+learning, though not, to our knowledge, applied to a physical control problem
+where the binding quantity can be predicted in advance. Henderson et al.\
+\citep{henderson2018matters} documented how seed-to-seed variance can swamp the
+algorithmic differences a paper sets out to measure; Engstrom et al.\
+\citep{engstrom2020implementation} showed that implementation details, not the
+nominal algorithm, accounted for much of PPO's reported advantage over TRPO;
+Andrychowicz et al.\ \citep{andrychowicz2021what} found hyperparameters
+dominating architectural choices at scale; and Agarwal et al.\
+\citep{agarwal2021precipice} argued for reporting effect sizes and uncertainty
+rather than point estimates from few runs, a practice we follow throughout
+Section~\ref{sec:ablations}. What we add to this literature is a case in which
+the dominant hyperparameter --- the exploration scale --- is not merely
+discoverable by sweeping it, but \emph{computable in advance} from a classical
+design of the same plant, which is not true of hyperparameters in the
+general-purpose benchmarks this literature studies. Residual formulations, in
+which a learned policy corrects a fixed classical controller rather than
+replacing it \citep{johannink2019residual,silver2018residual}, appear here as
+one of the variants we evaluate rather than as the proposed method.
 
 \section{Problem formulation}
 \label{sec:problem}
@@ -245,26 +307,46 @@ per-agent credit and the evaluation metric to be literally the same quantity
 
 \subsection{Model}
 
-We use a modally reduced uniform cantilever wing. The structure is a Galerkin
-projection onto exact clamped-free bending and fixed-free torsion modes, with all
-generalised mass and stiffness integrals evaluated by Gauss--Legendre quadrature.
-Aerodynamics are strip theory carrying the full Theodorsen non-circulatory terms
-\citep{theodorsen1935}, with the circulatory lag realised in the time domain by
-two Wagner lag states per strip \citep{jones1940}. Control surfaces contribute
-quasi-steady thin-airfoil flap derivatives from the Glauert series, integrated
-over each surface's spanwise band. The equation of motion is
+We use a modally reduced uniform cantilever wing, shown schematically in
+Figure~\ref{fig:schematic}. Three trailing-edge surfaces occupy spanwise bands at
+$[0.05,0.40]$, $[0.40,0.72]$ and $[0.72,0.98]$ of the semispan (panel a), hinged
+at \SI{75}{\percent} chord (panel b), with $\pm\SI{15}{\degree}$ travel,
+\SI{200}{\degree\per\second} rate limit and a \SI{20}{\milli\second} first-order
+servo lag. Each surface is commanded by its own agent, which observes only a
+local accelerometer pair, local plunge and twist rate, its own saturation
+fraction, and air data; no agent observes the modal state, and the three agents
+share no channel unless a communication mechanism is explicitly under test
+(panel c). Control runs at \SI{200}{\hertz}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_schematic.pdf}
+\caption{The testbed. (a) Planform, agent colours matched throughout the paper.
+(b) The typical-section degrees of freedom and the flap hinge that the
+thin-airfoil derivative in Section~\ref{sec:sharpy} refers to. (c) The
+information structure: each agent closes its own loop through the shared plant,
+with no inter-agent channel in the plain and physics-credit policies.}
+\label{fig:schematic}
+\end{figure}
+
+The structure is a Galerkin projection onto exact clamped-free bending and
+fixed-free torsion modes, with all generalised mass and stiffness integrals
+evaluated by Gauss--Legendre quadrature. Aerodynamics are strip theory carrying
+the full Theodorsen non-circulatory terms \citep{theodorsen1935}, with the
+circulatory lag realised in the time domain by two Wagner lag states per strip
+\citep{jones1940}. Control surfaces contribute quasi-steady thin-airfoil flap
+derivatives from the Glauert series, integrated over each surface's spanwise
+band. The equation of motion is
 \begin{equation}
 M \ddot q + C \dot q + K q \;=\; L\, x_{\mathrm{w}} + B \delta
 + b_{\mathrm{g}} w_{\mathrm{g}} ,
 \label{eq:eom}
 \end{equation}
-with plunge positive down and twist positive nose-up. The state has 56
-dimensions: four modal coordinates and their rates, plus two wake states on each
-of 24 strips. Three trailing-edge surfaces occupy spanwise bands at
-$[0.05,0.40]$, $[0.40,0.72]$ and $[0.72,0.98]$ of the semispan, hinged at
-\SI{75}{\percent} chord, with $\pm\SI{15}{\degree}$ travel,
-\SI{200}{\degree\per\second} rate limit and a \SI{20}{\milli\second} first-order
-servo lag. Control runs at \SI{200}{\hertz}.
+with plunge positive down and twist positive nose-up, following the sign
+convention shown in Figure~\ref{fig:schematic}b. The state has 56 dimensions:
+four modal coordinates and their rates, plus two wake states on each of 24
+strips. Full geometric, structural and actuator parameters are tabulated in
+\ref{app:parameters} for reproducibility.
 
 \subsection{Validation against the published benchmark}
 
@@ -582,6 +664,93 @@ degrades performance relative to a plain policy with the same credit signal.}
 \input{ablation_arch}
 \end{table}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_ablation.pdf}
+\caption{Every controller and variant on one axis. Top: feasible conditions held
+without divergence, out of the six the fault-aware oracle shows are stabilisable.
+Bottom: mean decay rate on healthy conditions. The learned variants (purple)
+match the classical rungs on robustness while trailing them on nominal damping,
+except for \texttt{residual\_only}, which is the strongest learned result on
+both axes simultaneously.}
+\label{fig:ablation}
+\end{figure}
+
+Figure~\ref{fig:ablation} puts every controller from Sections~\ref{sec:results}
+and~\ref{sec:ablations} on common axes. The pattern is visible at a glance in a
+way the tables cannot show as directly: the learned variants cluster with the
+classical rungs on the robustness axis (top) while forming a visibly separate,
+weaker band on the nominal-performance axis (bottom) --- with one exception. The
+residual policy, which corrects a decentralised LQG rather than replacing it,
+is the only learned variant that reaches into the range the classical
+controllers occupy on \emph{both} axes at once.
+
+\section{Emergent spanwise phase coordination}
+\label{sec:phase}
+
+``Emergent coordination'' is easy to assert about a multi-agent policy and hard
+to pin down, so before making any such claim we define it as something
+measurable: the phase at which each surface deflects relative to the critical
+structural mode's velocity, as a function of spanwise station. A controller with
+no notion of the mode shape should show no systematic phase progression along the
+span; one that has effectively discovered the mode shape should show a
+consistent progression matched to it. The measurement --- the cross-spectrum of
+each surface's deflection against the first bending mode's velocity, evaluated at
+the frequency where the modal response peaks --- is applied identically to every
+controller, classical or learned, so a learned pattern can be held against what
+optimal centralised synthesis produces rather than admired in isolation.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.86\textwidth]{figures/fig_phase.pdf}
+\caption{Spanwise actuation phase (top) and gain (bottom) at each controller's
+dominant response frequency. A sloped phase profile is a travelling-wave
+actuation pattern matched to the mode shape; a flat profile is purely local
+reaction. Legend entries give the phase gradient and the RMS actuation
+authority used.}
+\label{fig:phase}
+\end{figure}
+
+Applied to the classical ladder the instrument already separates the rungs
+sharply (Figure~\ref{fig:phase}, first three series). Local rate feedback is
+essentially flat at $-15\si{\degree}$ per semispan and responds at
+\SI{5.50}{\hertz} --- it never engages the unstable mode at all, which is the
+mechanism behind its poor performance rather than a separate fact about it. The
+fully decentralised LQG reaches $+27\si{\degree}$ per semispan at
+\SI{7.50}{\hertz}, and centralised LQG develops $+90\si{\degree}$ per semispan
+while operating at \SI{11.00}{\hertz} --- matching the \SI{11.03}{\hertz} the
+eigenvalue analysis of Section~\ref{sec:sharpy}'s plant predicts for the flutter
+mode almost exactly. The pattern is monotone: the more capable the controller,
+the stronger its spanwise phase progression, and only the optimal centralised
+design locks onto the true flutter frequency.
+
+The learned policies give this a genuine test rather than a demonstration. The
+strongest credit-only policy, \texttt{ippo\_blended}, locks onto
+\SI{11.00}{\hertz} --- the same frequency as centralised LQG, and the same
+frequency the eigenvalue analysis predicts --- with a phase gradient of
+$+121\si{\degree}$ per semispan, steeper than the centralised design's. It
+reaches this from six accelerometer channels, no communication, and no
+information about the mode shape beyond what the reward and dynamics implicitly
+encode. The residual policy locks onto a different, higher-frequency mode
+($+170\si{\degree}$ per semispan at \SI{15.50}{\hertz}) rather than the primary
+flutter mode, which is consistent with it correcting a base law that already
+suppresses the primary mode and spending its own authority on what is left. We
+read the first result as the concrete, falsifiable content behind the word
+``emergent'' in this paper: a distributed policy that has never been told the
+mode shape can converge, from local measurement alone, on the same resonant
+frequency that full-state, full-model synthesis converges on by construction.
+
+The same measurement also corrects a wrong inference authority alone would
+suggest. Local rate feedback uses \SI{44.7}{\percent} of available deflection to
+reach $-0.03\,\mathrm{s}^{-1}$; centralised LQG uses \SI{0.7}{\percent} to reach
+$-5.52$. The better the controller, the \emph{less} authority it spends, because
+flutter suppression is a phase-precision problem rather than a control-power
+one. The learned policies (\SIrange{1.2}{1.3}{\percent} authority) are
+accordingly not under-actuated, which a reading of the deflection magnitudes
+alone might suggest; they apply an amount of authority comparable to the good
+classical controllers, at a phase that is closer to optimal than local feedback
+achieves but not yet as sharp as the centralised design.
+
 \section{What limits learning here}
 \label{sec:exploration}
 
@@ -620,6 +789,62 @@ computable before any training, from a classical design or from an estimate of
 the damping authority required. Scale the exploration to it. On this problem that
 single number mattered more than every algorithmic choice we made, and it is
 cheap to check.
+
+\section{Discussion}
+\label{sec:discussion}
+
+Pulling the pieces together: this study set out to ask whether treating each
+control surface as a separate learning agent is a workable way to suppress
+flutter, and the honest answer is conditional. On the credit-assignment
+question the answer is yes, with numbers behind it. On the question of whether
+the resulting policies are ready to fly, the answer is not yet, and the gap to a
+classical decentralised design is real rather than an artefact of tuning
+(Section~\ref{sec:results}). We think both halves of that answer are useful to a
+reader, which is why neither is relegated to a footnote.
+
+\paragraph{For practitioners}
+The most actionable finding is the least glamorous one. Before training a policy
+for a physical control task, compute the actuation amplitude a competent
+classical controller would use, and check the initial exploration scale against
+it. On this plant the two were separated by roughly a factor of forty at a
+conventional PPO setting, and every algorithmic refinement we tried was
+invisible until that gap was closed. We would expect a version of this check to
+be worth running on any task where a linear or classical baseline is available
+even loosely, which covers most physical control problems a control engineering
+audience would consider.
+
+\paragraph{For the credit-assignment literature}
+The result in Section~\ref{sec:ablations} is, as far as we can tell, a genuine
+instance of a difference reward with no estimation step at all, on a task with
+real physical structure rather than a toy coordination game. That the closed
+form and the shaping term are individually insufficient but jointly significant
+is itself informative: it says the myopic, instantaneous part of the credit
+signal and the long-horizon part are not substitutes for one another on a
+coupled oscillatory system, which is a more specific claim than ``shaping
+helps.''
+
+\paragraph{On the negative architecture result}
+We were not expecting the phasor consensus and phase-locked action head to
+hurt, and reporting that they do is worth more caution than reporting a positive
+result would need. A plausible interpretation is that a three-surface, six-metre
+wing with broadcast air data is simply too small a coordination problem for an
+explicit channel to earn its bandwidth cost in gradient-fitting difficulty, and
+the eight-surface result --- where every condition becomes feasible for the
+learned policies --- is at least consistent with that story, though we did not
+run it to the statistical standard we hold the main claims to
+(\ref{sec:limitations}). We would read our result as a caution against building
+communication machinery into a distributed controller by default, on the
+strength of a physical argument, without first checking whether a plain policy
+with the same credit signal already does the job.
+
+\paragraph{Why we still find phase coordination the most striking result}
+A policy trained end to end on a shaped scalar reward, using only its own two
+accelerometers, converges on the same resonant frequency that a full-state
+Kalman-filtered LQG converges on by construction (Section~\ref{sec:phase}). That
+frequency is not supplied anywhere in the reward, the observation, or the
+network architecture; it is a property of the coupled structure that the policy
+has to find. We think this is the sense in which the word ``emergent'' is
+earned here, as distinct from being merely asserted.
 
 \section{Limitations}
 \label{sec:limitations}
@@ -666,6 +891,101 @@ vibration control more broadly.
 \section*{Code and data availability}
 The plant, baselines, training code, evaluation harness and the SHARPy
 cross-validation scripts are available at the project repository.
+
+\appendix
+
+\section{Testbed parameters}
+\label{app:parameters}
+
+Table~\ref{tab:params-wing} gives the geometric and structural parameters of the
+wing and Table~\ref{tab:params-actuator} the actuator and sensing parameters,
+common to every controller in this study. All are the values used to generate
+Table~\ref{tab:validation}.
+
+\begin{table}[h]
+\centering
+\caption{Wing geometry and structural properties.}
+\label{tab:params-wing}
+\begin{tabular}{lr}
+\toprule
+Parameter & Value \\
+\midrule
+Semispan & \SI{6.096}{\metre} \\
+Chord & \SI{1.8288}{\metre} \\
+Mass per unit length & \SI{35.71}{\kilo\gram\per\metre} \\
+Polar inertia per unit length (about EA) & \SI{8.64}{\kilo\gram\metre} \\
+Bending stiffness $EI$ & $\SI{9.77e6}{\newton\metre\squared}$ \\
+Torsional stiffness $GJ$ & $\SI{0.987e6}{\newton\metre\squared}$ \\
+Elastic axis & \SI{33}{\percent} chord \\
+Centre of gravity & \SI{43}{\percent} chord \\
+Bending / torsion modes retained & 2 / 2 \\
+Aerodynamic strips & 24 \\
+Air density (sea level) & \SI{1.225}{\kilo\gram\per\cubic\metre} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Control surface, actuator and sensing parameters (identical for all
+three surfaces).}
+\label{tab:params-actuator}
+\begin{tabular}{lr}
+\toprule
+Parameter & Value \\
+\midrule
+Spanwise bands (fraction of semispan) & $[0.05,0.40]$, $[0.40,0.72]$, $[0.72,0.98]$ \\
+Hinge location & \SI{75}{\percent} chord \\
+Deflection travel & $\pm\SI{15}{\degree}$ \\
+Rate limit & \SI{200}{\degree\per\second} \\
+Actuator time constant & \SI{20}{\milli\second} \\
+Control update rate & \SI{200}{\hertz} \\
+Local observation per agent & 2 accelerometers, plunge/twist rate, own
+saturation, air data \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Training hyperparameters}
+\label{app:hyperparameters}
+
+Table~\ref{tab:params-ppo} lists the PPO and network hyperparameters shared
+across every learned variant in Sections~\ref{sec:ablations}
+and~\ref{sec:exploration}, except where a hyperparameter is itself the subject
+of an ablation (the initial exploration standard deviation, and the presence or
+absence of the architectural mechanisms in Table~\ref{tab:ablation-arch}). All
+runs share parameters across agents, with the agent index supplied as a one-hot
+input, so the parameter count does not grow with the number of surfaces.
+
+\begin{table}[h]
+\centering
+\caption{PPO and network hyperparameters.}
+\label{tab:params-ppo}
+\begin{tabular}{lr}
+\toprule
+Hyperparameter & Value \\
+\midrule
+Parallel environments & 128 \\
+Rollout length & 128 steps \\
+Epochs per update & 4 \\
+Minibatches per epoch & 4 \\
+BPTT segment length & 32 steps \\
+Learning rate (Adam) & $3\times 10^{-4}$ \\
+Discount $\gamma$ & 0.995 \\
+GAE $\lambda$ & 0.95 \\
+PPO clip range & 0.2 \\
+Value loss coefficient & 0.5 \\
+Entropy coefficient & $2\times 10^{-3}$ (0 in the exploration sweep) \\
+Max gradient norm & 0.5 \\
+Curriculum fraction & 0.4 of training \\
+Hidden layer width (trunk) & 128 \\
+Phasor encoder hidden width & 64 \\
+Retained modes per phasor & 2 \\
+Consensus rounds & 2 \\
+Action-head output-layer gain (init.) & 0.01 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \bibliographystyle{elsarticle-harv}
 \bibliography{refs,refs_extra}
