@@ -202,43 +202,77 @@ that template have been demonstrated on wind-tunnel models
 structures with limit-cycle behaviour \citep{block1998applied}; Livne
 \citep{livne2018flutter} surveys the state of the art and the gap between
 laboratory demonstrations and certified hardware, and Mukhopadhyay
-\citep{mukhopadhyay2003historical} traces the field's history. What none of
-these treatments questions is the centralised structure itself: the regulator
-sees the whole state and commands every surface jointly, which is exactly the
-assumption a physically distributed set of actuators need not satisfy. The
-unsteady aerodynamic models underlying both the classical literature and our own
-plant descend from Theodorsen's frequency-domain analysis
-\citep{theodorsen1935} and the indicial (Wagner-function) formulation of Jones
-\citep{jones1940}; finite-state induced-flow models
-\citep{peters1995finite} are the modern sectional alternative, and
+\citep{mukhopadhyay2003historical} traces the field's history from Theodorsen's
+original frequency-domain analysis to modern aeroservoelastic synthesis. Two
+things stand out reading this literature together. First, every design in it is
+re-derived for a new airframe: the state-space model, the actuator suite and
+the sensor placement all change with the aircraft, and Livne's survey is
+explicit that the gap between a laboratory demonstration and certified hardware
+is as much about this re-engineering cost as about control-theoretic novelty.
+Second, and more consequential for this paper, none of these treatments
+questions the centralised structure itself: the regulator sees the whole state
+and commands every surface jointly, which is exactly the assumption a
+physically distributed set of actuators --- multiple independently wired
+trailing-edge surfaces on a modern flexible wing, each with its own local
+sensing --- need not satisfy. Karpel's original formulation
+\citep{karpel1982design} already treats gust alleviation and flutter
+suppression as the same state-feedback problem, and we inherit that framing for
+the objective in Section~\ref{sec:problem} even though the control structure we
+study departs from it. The unsteady aerodynamic models underlying both the
+classical literature and our own plant descend from Theodorsen's
+frequency-domain analysis \citep{theodorsen1935} and the indicial
+(Wagner-function) formulation of Jones \citep{jones1940}; finite-state
+induced-flow models \citep{peters1995finite} are the modern sectional
+alternative, extending the same lag-state idea to a richer wake representation
+than the two-state approximation we use, and
 \citep{fung1955,bisplinghoff1955,palacios2023flexible} are the standard texts we
-draw the modelling conventions from.
+draw the modelling conventions from, with Palacios and Cesnik
+\citep{palacios2023flexible} in particular covering the coupled
+flight-mechanics setting our plant deliberately simplifies away from.
 
 \paragraph{Learning for flutter control}
 A recent line of work applies deep reinforcement learning directly to flutter
 suppression: stall flutter via active camber morphing
 \citep{stallflutter2025}, trailing-edge circulation control validated in a wind
 tunnel \citep{circulation2023}, and tuning the parameters of a conventional
-aeroservoelastic controller \citep{flyingwing2022}. Despite using different
-effectors and different plants, all three share the same structural assumption
-as the classical literature they replace a hand-designed gain in: one learning
-agent, one effector, one global observation. We are not aware of prior work that
-treats the individual control surfaces of a single wing as separate learning
-agents, which is the gap this paper occupies.
+aeroservoelastic controller \citep{flyingwing2022}. The appeal of learning here
+is specific to the problem, not generic: flutter is a nonlinear instability once
+the response leaves the small-perturbation regime the classical model is valid
+in, the aerodynamic model available in flight is never exactly the design model,
+and a policy that has seen a distribution of conditions in simulation can in
+principle interpolate across off-nominal cases a fixed gain cannot. Despite
+using different effectors and different plants, the three studies above share
+the same structural assumption as the classical literature they replace a
+hand-designed gain in: one learning agent, one effector, one global observation.
+None asks what changes when the effectors are commanded by separate agents that
+cannot see the whole wing, which is the question a wing with several
+independently actuated surfaces on a shared bus makes practically relevant and
+is the gap this paper occupies. We are not aware of prior work that treats the
+individual control surfaces of a single wing as separate learning agents.
 
 \paragraph{Decentralised control}
 That decentralisation costs closed-loop performance relative to a centralised
 design with the same model is a classical result, not a symptom of using
-learning
-\citep{siljak1991decentralized,bakule2008decentralized}, and the structural
-conditions under which decentralised synthesis remains \emph{tractable} at all
-are characterised by Rotkowitz and Lall \citep{rotkowitz2006characterization}.
-This literature is why we treat the information structure as an experimental
+learning \citep{siljak1991decentralized,bakule2008decentralized}. Bakule's
+survey \citep{bakule2008decentralized} catalogues exactly the design patterns
+this paper's baseline ladder instantiates --- decentralised state feedback with
+no inter-subsystem model, and decentralised observers each estimating only a
+local state --- and reports the same qualitative cost of decentralisation across
+a wide range of application domains, well outside aeroelasticity. The
+structural conditions under which decentralised synthesis remains
+\emph{tractable} at all, rather than merely stable, are characterised by
+Rotkowitz and Lall \citep{rotkowitz2006characterization}: convex synthesis
+survives decentralisation exactly when the information structure is
+\emph{quadratically invariant} with respect to the plant, a condition our
+line-graph sensing pattern does not satisfy in general, which is part of why
+the fully decentralised LQG of \ref{app:baselines} is synthesised
+independently per surface rather than as a single convex program. This
+literature is why we treat the information structure as an experimental
 variable rather than an afterthought: comparing a distributed learned policy
 against a centralised regulator conflates the control method with the
-information available to it, and the honest classical baseline for a policy that
-sees only local accelerometers is a fully decentralised LQG built from the same
-sensing, not the centralised design that the learned policy could never in
+information available to it, and the honest classical baseline for a policy
+that sees only local accelerometers is a fully decentralised LQG built from the
+same sensing, not the centralised design that the learned policy could never in
 principle match.
 
 \paragraph{Multi-agent credit assignment}
@@ -249,24 +283,66 @@ counterfactual advantage baseline to the same end; MADDPG
 \citep{lowe2017maddpg} and MAPPO \citep{yu2022mappo} are the common actor-critic
 baselines built on top of these ideas, the field more broadly is surveyed in
 \citep{albrecht2023survey,scalingmarl2025}, and estimators continue to be
-refined \citep{multilevelcredit2025}. All of these methods are general
-\emph{because} they assume nothing about the environment and therefore have to
-estimate the decomposition from experience. Our contribution is narrower and
-complementary rather than competing with this literature: for the specific class
-of energy-conserving structural plant studied here, the decomposition these
-methods estimate is available in closed form, so none of the machinery built to
-estimate it is needed. The formal setting for the distributed problem itself is
-the decentralised POMDP \citep{bernstein2002complexity,oliehoek2016concise}.
+refined \citep{multilevelcredit2025}. These methods differ in how much they
+assume about the environment, but all of them estimate the credit
+decomposition statistically, from returns a policy happens to collect: VDN and
+QMIX \citep{sunehag2018vdn,rashid2018qmix} learn a factorisation of a joint
+value function, COMA \citep{foerster2018coma} learns a counterfactual baseline
+by marginalising a learned critic over one agent's action, and the original
+difference-reward formulation \citep{wolpert2002difference} itself typically
+requires a counterfactual rollout with the agent of interest removed. All of
+this machinery exists \emph{because} the environment is treated as a black box.
+Our contribution is narrower and complementary rather than competing with this
+literature: for the specific class of energy-conserving structural plant
+studied here, the decomposition these methods estimate is available in closed
+form directly from the equations of motion (Proposition~\ref{prop:diff}), with
+no learning, no counterfactual rollout and no critic involved in computing it.
+We see this less as a competitor to the general-purpose methods above than as
+evidence that physical structure, where it exists, is worth exploiting before
+reaching for a general estimator built to work without it. The formal setting
+for the distributed problem itself is the decentralised POMDP
+\citep{bernstein2002complexity,oliehoek2016concise}, whose complexity results
+motivate treating partial observability as intrinsic to the sensing
+architecture (Section~\ref{sec:problem}) rather than as a modelling
+simplification to be relaxed.
 
 \paragraph{Learned communication}
 CommNet \citep{sukhbaatar2016commnet} and TarMAC \citep{das2019tarmac} learn
-message content end to end from a broad channel. We took the opposite design
-choice and fixed the message \emph{space} to a modal phasor derived from the
-physics, on the reasoning that this would make the channel interpretable and
-bound its bandwidth independently of the number of agents. Measured against a
-plain policy with no channel at all, it did not help on this plant
-(Section~\ref{sec:ablations}), and we report the negative result rather than
-omit the mechanism.
+message content end to end from a broad channel, with TarMAC additionally
+learning \emph{who} to attend to via a signature-based attention mechanism over
+neighbours. We took the opposite design choice on both counts: message
+\emph{content} is fixed to a modal phasor derived from the physics rather than
+learned end to end, and message \emph{routing} is fixed to the spanwise line
+graph rather than learned, on the reasoning that this would make the channel
+interpretable and bound its bandwidth independently of the number of agents ---
+a property that matters on a physical avionics bus in a way it does not in the
+simulated coordination games this literature is usually evaluated on. Measured
+against a plain policy with no channel at all, neither the fixed content nor
+the fixed routing helped on this plant (Section~\ref{sec:ablations}), and we
+report the negative result rather than omit the mechanism; Section~\ref{sec:discussion}
+returns to what we think this does and does not say about learned communication
+more broadly.
+
+\paragraph{Multi-agent benchmarks and physical grounding}
+The environment in this paper is implemented against the PettingZoo
+parallel-environment API \citep{terry2021pettingzoo}, the standard interface
+much of the multi-agent reinforcement learning literature above is evaluated
+through, including the particle-world benchmarks introduced alongside MADDPG
+\citep{lowe2017maddpg}. That shared interface is deliberate: it is what lets
+the credit-assignment and communication mechanisms surveyed above be dropped
+into this environment largely unmodified, which is what makes the ablations of
+Section~\ref{sec:ablations} a fair test of those mechanisms rather than a test
+of our own re-implementation of them. Where this environment differs from the
+particle-world and grid-world benchmarks that dominate the credit-assignment
+literature is that its dynamics are not designed for the coordination problem
+they pose; they are a validated model of a physical instability
+(Section~\ref{sec:plant}), and the credit structure in
+Proposition~\ref{prop:diff} is a property of that physics rather than of the
+environment's authorial choices. We think this is a meaningful axis along
+which physically-grounded multi-agent control tasks are currently
+under-represented relative to abstract coordination games, and offer this
+testbed as one instance of closing that gap rather than as a claim that
+abstract benchmarks are not useful for what they are designed to measure.
 
 \paragraph{Reinforcement learning practice}
 Our central caution has direct precedent in general-purpose reinforcement
@@ -280,16 +356,57 @@ Andrychowicz et al.\ \citep{andrychowicz2021what} found hyperparameters
 dominating architectural choices at scale; and Agarwal et al.\
 \citep{agarwal2021precipice} argued for reporting effect sizes and uncertainty
 rather than point estimates from few runs, a practice we follow throughout
-Section~\ref{sec:ablations}. What we add to this literature is a case in which
-the dominant hyperparameter --- the exploration scale --- is not merely
-discoverable by sweeping it, but \emph{computable in advance} from a classical
-design of the same plant, which is not true of hyperparameters in the
-general-purpose benchmarks this literature studies. Residual formulations, in
-which a learned policy corrects a fixed classical controller rather than
-replacing it \citep{johannink2019residual,silver2018residual}, appear here as
-one of the variants we evaluate rather than as the proposed method.
+Section~\ref{sec:ablations}. Yu et al.\ \citep{yu2022mappo} make a related point
+specific to the multi-agent setting: much of MAPPO's reported advantage over
+more elaborate multi-agent actor-critic methods traces to implementation
+details --- value normalisation, advantage standardisation, the choice of
+critic input --- rather than to the algorithm's nominal novelty, which is the
+multi-agent analogue of Engstrom et al.'s finding and part of why
+Section~\ref{sec:architecture} documents our own architecture choices at the
+level of individual design decisions rather than only by name. What we add to
+this literature is a case in which the dominant hyperparameter --- the
+exploration scale --- is not merely discoverable by sweeping it, but
+\emph{computable in advance} from a classical design of the same plant, which
+is not true of hyperparameters in the general-purpose benchmarks this
+literature studies. Residual formulations, in which a learned policy corrects a
+fixed classical controller rather than replacing it
+\citep{johannink2019residual,silver2018residual}, appear here as one of the
+variants we evaluate rather than as the proposed method.
 
-\section{Problem formulation}
+\paragraph{Positioning}
+Table~\ref{tab:positioning} summarises the four axes above together, since no
+single prior study we are aware of combines more than one of them: multi-agent
+treatment of the individual control surfaces of one wing, a credit signal
+derived in closed form from the plant's own physics rather than estimated,
+validation of the plant itself against a higher-fidelity solver rather than
+only against a published linear benchmark, and an explicit, reproducible
+account of what a conventional exploration setting hides. Each axis is
+individually present somewhere in the literature surveyed above; their
+combination, and the negative and cautionary results that combination
+surfaces, is what this paper contributes.
+
+\begin{table}[t]
+\centering
+\caption{This paper against the literature it draws on, along the axes
+Section~\ref{sec:related} discusses. A \checkmark marks that the property
+holds for the representative citation(s) in that row.}
+\label{tab:positioning}
+\small
+\begin{tabular}{@{}p{4.4cm}ccc@{}}
+\toprule
+& Multi-agent & Closed-form & Validated against \\
+& surfaces & credit & higher-fidelity solver \\
+\midrule
+Classical AFS \citep{karpel1982design,waszak2001robust} & -- & n/a & varies \\
+Learned AFS \citep{stallflutter2025,circulation2023,flyingwing2022} & -- & -- & -- \\
+General MARL credit \citep{sunehag2018vdn,rashid2018qmix,foerster2018coma} & \checkmark & -- & n/a \\
+Residual control \citep{johannink2019residual,silver2018residual} & -- & -- & n/a \\
+This paper & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Problem formulation and plant model}
 \label{sec:problem}
 
 \subsection{Decentralised partially observable decision process}
@@ -323,10 +440,8 @@ than as an accumulated quadratic cost, matters later: it is what allows the
 per-agent credit and the evaluation metric to be literally the same quantity
 (Section~\ref{sec:log}).
 
-\section{Plant model and validation}
-\label{sec:plant}
-
 \subsection{Model}
+\label{sec:plant}
 
 We use a modally reduced uniform cantilever wing, shown schematically in
 Figure~\ref{fig:schematic}. Three trailing-edge surfaces occupy spanwise bands at
@@ -594,7 +709,7 @@ action head
 \end{algorithmic}
 \end{algorithm}
 
-\section{Network architecture}
+\subsection{Network architecture}
 \label{sec:architecture}
 
 The ablation in Section~\ref{sec:ablations} names four architectural variants
@@ -702,7 +817,7 @@ by fighting the base controller. Actions are Gaussian with a learned,
 state-independent log-standard-deviation shared across agents --- the quantity
 swept in Section~\ref{sec:exploration}.
 
-\section{Experimental design}
+\section{Experimental evaluation}
 \label{sec:design}
 
 \subsection{A baseline ladder that separates method from information}
@@ -736,7 +851,48 @@ episodes leaving the linear regime, the decay rate \eqref{eq:objective}, peak ti
 plunge, and RMS deflection. Following \citep{agarwal2021precipice} we report
 effect sizes and significance rather than means alone.
 
-\section{Results}
+\subsection{Training convergence}
+\label{sec:convergence}
+
+Figure~\ref{fig:learning} gives the training-time behaviour behind every
+learned number in this section: mean structural energy and divergence rate
+over training, evaluated on the curriculum task distribution rather than the
+held-out grid of Table~\ref{tab:main}, averaged across the seeds reported for
+each variant. Three things are worth stating plainly, since a final decay rate
+alone does not show them. First, every variant is within a small margin of its
+asymptote by \num{750000} of the \num{1500000} environment steps budgeted
+(Table~\ref{tab:params-ppo}); the training budget was not tuned to the point of
+convergence after the fact; it was chosen with headroom, and Figure~\ref{fig:learning}
+is the check that the headroom was enough. Second, \texttt{residual\_only}
+starts substantially lower than every other variant and stays there for the
+first \num{200000} steps, which is the training-time signature of the
+small-gain initialisation of Section~\ref{sec:architecture}: a residual policy
+that begins as a near-no-op inherits the decentralised LQG base law's
+performance from update one, rather than the near-open-loop performance every
+other variant starts from. Third, the divergence rate --- which is a training statistic, not the
+evaluation metric of Table~\ref{tab:main} --- spikes above \SI{0.5}{\percent}
+only in the first few thousand steps, before any policy has learned anything,
+while the curriculum's speed range and failure rate are still ramping up from
+their easiest setting (Algorithm~\ref{alg:mocca}; only the training
+\emph{sampling} is eased, never the evaluation grid), and settles below
+\SI{0.15}{\percent} for the remainder of training across every variant. We read
+this as evidence that the curriculum keeps training itself stable even where
+the resulting policy later struggles on the harder end of the evaluation grid;
+the two are different questions, and Figure~\ref{fig:learning} only answers the
+first one.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_learning.pdf}
+\caption{Training-time mean structural energy (left, log scale) and divergence
+rate (right) against environment steps, averaged over seeds, for every credit
+and architecture variant. All variants reach a stable plateau well inside the
+training budget; \texttt{residual\_only} converges fastest because it starts
+from a decentralised LQG base law rather than from scratch.}
+\label{fig:learning}
+\end{figure}
+
+\subsection{Results}
 \label{sec:results}
 
 Before the aggregate numbers, Figure~\ref{fig:timedomain} shows what a single
@@ -804,7 +960,7 @@ matching the fault-aware oracle; at $\sigma=0.05$ they hold five, as the
 classical controllers do, while damping three times better. Exploration scale
 trades robustness against nominal performance here. We report both halves.
 
-\section{Ablations}
+\subsection{Ablations}
 \label{sec:ablations}
 
 \paragraph{Credit assignment}
@@ -877,7 +1033,7 @@ residual policy, which corrects a decentralised LQG rather than replacing it,
 is the only learned variant that reaches into the range the classical
 controllers occupy on \emph{both} axes at once.
 
-\section{Emergent spanwise phase coordination}
+\subsection{Emergent spanwise phase coordination}
 \label{sec:phase}
 
 ``Emergent coordination'' is easy to assert about a multi-agent policy and hard
@@ -943,7 +1099,7 @@ alone might suggest; they apply an amount of authority comparable to the good
 classical controllers, at a phase that is closer to optimal than local feedback
 achieves but not yet as sharp as the centralised design.
 
-\section{What limits learning here}
+\subsection{What limits learning here}
 \label{sec:exploration}
 
 Figure~\ref{fig:exploration} is the finding with the widest reach. Holding
@@ -982,7 +1138,7 @@ the damping authority required. Scale the exploration to it. On this problem tha
 single number mattered more than every algorithmic choice we made, and it is
 cheap to check.
 
-\section{Additional probes}
+\subsection{Additional probes}
 \label{sec:probes}
 
 The results above are held to a fixed standard: six seeds, Welch's $t$-test,
@@ -1077,8 +1233,10 @@ we would recommend. We stand by the qualitative claim that eight-surface
 architectures fail less catastrophically than three-surface ones, and retract
 any stronger reading of it than that.
 
-\section{Discussion}
+\section{Discussion and conclusion}
 \label{sec:discussion}
+
+\subsection{Discussion}
 
 Pulling the pieces together: this study set out to ask whether treating each
 control surface as a separate learning agent is a workable way to suppress
@@ -1137,7 +1295,7 @@ network architecture; it is a property of the coupled structure that the policy
 has to find. We think this is the sense in which the word ``emergent'' is
 earned here, as distinct from being merely asserted.
 
-\section{Limitations}
+\subsection{Limitations}
 \label{sec:limitations}
 
 \begin{itemize}
@@ -1164,7 +1322,7 @@ expect it to generalise to control tasks whose useful actuation band is narrow
 relative to the action range, but have not shown that.
 \end{itemize}
 
-\section{Conclusion}
+\subsection{Conclusion}
 
 Posing flutter suppression as a distributed learning problem exposes a credit
 structure the physics resolves in closed form: the difference reward is an
