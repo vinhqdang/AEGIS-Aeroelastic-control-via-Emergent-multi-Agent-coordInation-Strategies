@@ -553,14 +553,18 @@ alone.
 \end{table}
 
 \paragraph{Architecture}
-The mechanisms we derived from the same physics do not survive measurement
+The mechanisms we derived from the same physics do not survive measurement, and
+at six seeds per variant none of the four survives even marginally
 (Table~\ref{tab:ablation-arch}). A plain feedforward policy with the blended
-credit reaches $-1.085$; adding a recurrent phasor encoder gives $-0.487$,
-adding phasor consensus $-0.279$, adding the phase-locked action head $-0.561$,
-and sharing raw neighbour observations $-0.583$. Two differences are significant
-against the plain policy ($d=-4.04$, $p=0.0006$ for consensus; $d=-2.62$,
-$p=0.006$ for the full architecture). Every elaboration we proposed made things
-worse.
+credit reaches $-1.085 \pm 0.243$; adding a recurrent phasor encoder gives
+$-0.474 \pm 0.249$, adding phasor consensus $-0.308 \pm 0.169$, adding the
+phase-locked action head (the full architecture) $-0.389 \pm 0.219$, and sharing
+raw neighbour observations $-0.596 \pm 0.227$. All four are significantly worse
+than the plain policy ($d=-2.48$, $p=0.0016$ for the recurrent encoder;
+$d=-3.72$, $p=0.0001$ for consensus; $d=-3.01$, $p=0.0004$ for the full
+architecture; $d=-2.08$, $p=0.0049$ for raw neighbour sharing). Every elaboration
+we proposed made things worse, and more seeds made the conclusion sharper rather
+than weaker.
 
 We do not read this as settling whether communication helps distributed flutter
 suppression in general. Three surfaces on a six-metre wing, with air data already

@@ -94,22 +94,22 @@ def main() -> None:
         print(f"  {status}  {label:34s} = {value:+.3f}")
 
     print("\nsignificance claims:")
-    for first, second in (
-        ("ippo_blended", "ippo_physics"),
-        ("ippo_blended", "shaped_shared"),
-    ):
-        if first in credit and second in credit:
-            effect, pvalue = welch(credit[first], credit[second])
+    sig_pairs = [
+        ("ippo_blended", "ippo_physics", credit),
+        ("ippo_blended", "shaped_shared", credit),
+        ("ippo_blended", "mocca", combined),
+        ("ippo_blended", "mocca_nohead", combined),
+        ("ippo_blended", "recurrent_only", combined),
+        ("ippo_blended", "comm_raw", combined),
+    ]
+    for first, second, source in sig_pairs:
+        if first in source and second in source:
+            effect, pvalue = welch(source[first], source[second])
             in_text = f"{pvalue:.3f}" in text or f"{pvalue:.4f}" in text
             print(f"  {first} vs {second}: d={effect:+.2f} p={pvalue:.4f}"
                   f"   {'p found in text' if in_text else 'p NOT found in text'}")
             if not in_text:
                 problems += 1
-
-    for other in ("mocca", "mocca_nohead", "recurrent_only", "comm_raw"):
-        if "ippo_blended" in combined and other in combined:
-            effect, pvalue = welch(combined["ippo_blended"], combined[other])
-            print(f"  ippo_blended vs {other:15s}: d={effect:+.2f} p={pvalue:.4f}")
 
     print(f"\n{problems} claim(s) in the text could not be matched to the data.")
     if problems:
