@@ -5,6 +5,7 @@
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
 \usepackage{amsmath,amssymb,amsthm}
+\usepackage{array}
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{siunitx}
@@ -76,6 +77,26 @@ learning \sep credit assignment \sep decentralised control \sep exploration
 \end{keyword}
 
 \end{frontmatter}
+
+\section*{Nomenclature}
+\begin{tabular}{@{}lp{10.2cm}@{}}
+$q,\dot q,\ddot q$ & modal coordinates, rates, accelerations \\
+$M,C,K$ & modal mass, damping, stiffness matrices \\
+$L,x_{\mathrm{w}}$ & wake-coupling matrix and wake (Wagner lag) states \\
+$B,\delta,b_k$ & control-influence matrix, deflection vector, its $k$th column \\
+$E$ & instantaneous structural energy, $\tfrac12\dot q^\top M\dot q+\tfrac12 q^\top Kq$ \\
+$P_k$ & control power of agent $k$, $(\dot q^\top b_k)\delta_k$ \\
+$\lambda$ & energy decay rate, $\tfrac12\,\mathrm{d}(\log E)/\mathrm{d}t$ \\
+$D_k$ & difference reward for agent $k$ \\
+$U,\Uf$ & airspeed, flutter speed \\
+$K$ & number of control surfaces / agents \\
+$R$ & number of retained modal phasors ($R{=}2$ throughout) \\
+$o_k,a_k$ & agent $k$'s local observation and normalised action \\
+$\hat\phi_k$ & agent $k$'s encoded phasor estimate, $\in\mathbb{R}^{2R}$ \\
+$e_k$ & consensus message received by agent $k$ \\
+$\sigma$ & initial policy exploration standard deviation (normalised action units) \\
+$d,p$ & Cohen's $d$ effect size, Welch's $t$-test $p$-value \\
+\end{tabular}
 
 \section{Introduction}
 \label{sec:intro}
@@ -329,6 +350,42 @@ with no inter-agent channel in the plain and physics-credit policies.}
 \label{fig:schematic}
 \end{figure}
 
+\subsection{What flutter and its suppression look like}
+\label{sec:filmstrip}
+
+Every quantity in the rest of the paper is a scalar derived from a wing that is
+physically bending and twisting, and it is worth seeing that motion once before
+reducing it to decay rates. Figure~\ref{fig:filmstrip} gives the same initial
+\SI{5}{\centi\metre} tip pluck two treatments at $U/\Uf=1.10$, six shared
+instants apart, on one shared deformation scale so a flat-looking row is not an
+axis artefact. Left to right along the top row is exactly what ``flutter''
+names: bending and torsion lock into a fixed phase relationship and the
+response grows, visibly, within under a second, until the linear model is no
+longer valid. The bottom row is the identical pluck under centralised LQR: by
+the second frame the deflection is already smaller than it was at $t=0$, and it
+stays there. Neither row is a simulation artefact of the illustration --- both
+are literal rollouts of the plant in Section~\ref{sec:plant} at the flight
+condition used throughout Section~\ref{sec:results}, rendered rather than
+tabulated. A supplementary animation of all four cases in the classical ladder
+(open loop, centralised LQR, local rate feedback, and centralised LQR with the
+outboard surface jammed) is provided alongside the code (Code and data
+availability); a static figure necessarily samples six instants; the animation
+shows the coalescing bending--torsion cycle itself, which the sampling interval
+here is deliberately too coarse to resolve.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_filmstrip.pdf}
+\caption{Six shared instants of the same \SI{5}{\centi\metre} initial tip pluck
+at $U/\Uf=1.10$, one shared deformation scale (dashed outline: the undeformed
+reference planform). Top: open loop -- bending and torsion coalesce and the
+response diverges within \SI{0.93}{\second}, at which point it leaves the
+linear regime and the rollout is stopped. Bottom: the identical pluck under
+centralised LQR, suppressed by the second frame and held near zero afterward.
+Agent colours match Figure~\ref{fig:schematic}.}
+\label{fig:filmstrip}
+\end{figure}
+
 The structure is a Galerkin projection onto exact clamped-free bending and
 fixed-free torsion modes, with all generalised mass and stiffness integrals
 evaluated by Gauss--Legendre quadrature. Aerodynamics are strip theory carrying
@@ -502,8 +559,13 @@ recomputed exactly at every step rather than stored and replayed. Updates run on
 sequences: minibatches are segments of consecutive steps unrolled with gradient
 from a detached stored hidden state. Sampling shuffled individual timesteps, as
 we did initially, trains any recurrence as a one-step map and gives a recurrent
-encoder no temporal gradient at all \citep{hausknecht2015drqn}.
-Algorithm~\ref{alg:mocca} summarises the procedure.
+encoder no temporal gradient at all \citep{hausknecht2015drqn}. A single
+illustrative run of \texttt{ippo\_physics} kept under the old shuffled-timestep
+sampler reached $-0.213\,\mathrm{s}^{-1}$, against $-0.566\pm0.123$ for the same
+variant under the sequence-based sampler used everywhere else in this paper
+(Table~\ref{tab:ablation-credit}); we report this as one run, not a claim, but
+it is the right order of magnitude for what a broken temporal gradient should
+cost. Algorithm~\ref{alg:mocca} summarises the procedure.
 
 \begin{algorithm}[t]
 \caption{Training with physics-exact credit}
@@ -531,6 +593,114 @@ action head
 \EndFor
 \end{algorithmic}
 \end{algorithm}
+
+\section{Network architecture}
+\label{sec:architecture}
+
+The ablation in Section~\ref{sec:ablations} names four architectural variants
+by the mechanism each adds; this section is what those names refer to, since a
+table of decay rates cannot substitute for knowing what \texttt{mocca} or
+\texttt{comm\_raw} actually computes. Figure~\ref{fig:architecture} shows the
+full pipeline, with the two optional stages --- the encoder and the consensus
+rounds --- and the optional action head shaded separately from the parts every
+variant shares.
+
+\paragraph{Shared trunk}
+Every variant feeds agent $k$'s local observation $o_k^t \in \mathbb{R}^{12}$,
+concatenated with a one-hot agent identity and (when enabled) an incoming
+consensus message $e_k^t$, through a two-layer $\tanh$ multilayer perceptron of
+width 128 to a latent $\ell_k^t$. Parameters are shared across agents; only the
+one-hot identity varies, which is what keeps the parameter count independent of
+the number of surfaces (Table~\ref{tab:params-ppo}) and is what makes the
+eight-surface scaling probe in Section~\ref{sec:probes} possible without
+retraining a wider network.
+
+\paragraph{Phasor encoder (\texttt{recurrent\_only} and beyond)}
+\label{sec:phasor-encoder}
+A single instantaneous accelerometer reading cannot distinguish a mode moving
+up from the same displacement moving down, so recovering phase needs memory. A
+per-agent GRU cell \citep{hausknecht2015drqn} carries a hidden state
+$h_k^t \in \mathbb{R}^{64}$ across the episode:
+\begin{equation}
+h_k^t = \mathrm{GRU}\!\left(o_k^t, h_k^{t-1}\right), \qquad
+\hat\phi_k^t = \tanh\!\left(W_{\mathrm{out}}\, h_k^t\right) \in \mathbb{R}^{2R},
+\label{eq:encoder}
+\end{equation}
+read as $R{=}2$ pairs $(\hat\phi_{k,r}^{\cos}, \hat\phi_{k,r}^{\sin})$, one per
+retained mode. The output is passed through $\tanh$ before it is used anywhere
+downstream: an unbounded phasor multiplied by a gain inside the action head
+saturates that head's own $\tanh$ at initialisation and kills the gradient
+before training starts, which is what the first implementation of this policy
+did. The phasor is carried as a $(\cos,\sin)$ pair rather than an angle
+throughout, so that wrap-around is not a discontinuity the network has to
+fight.
+
+\paragraph{Phasor consensus (\texttt{mocca} and \texttt{comm\_raw})}
+The communication mechanism is $T{=}2$ rounds of averaging over the spanwise
+line graph --- agent $k$ exchanges only with agents $k{-}1$ and $k{+}1$, which
+is what a distributed avionics bus physically offers. The operator
+\begin{equation}
+P = (1-w)\,I + w\,A, \qquad w = 0.5,
+\label{eq:consensus-operator}
+\end{equation}
+with $A$ the row-normalised adjacency of the line graph, is fixed rather than
+learned, so consensus adds no parameters; the bandwidth cost is the message
+itself, $2R{=}4$ numbers per agent per round regardless of how many surfaces
+there are. The consensus message is $e^t = P^T \hat\phi^t$ ($T$ applications of
+$P$), read back into the trunk of each agent as $e_k^t$.
+\texttt{comm\_raw} replaces $\hat\phi_k^t$ in this pipeline with the agent's raw
+local observation instead of the encoder's phasor estimate, testing whether the
+phasor abstraction itself is doing anything relative to simply broadcasting
+what a neighbour sees. When the health channel is enabled (used only in the
+residual-policy probes of Section~\ref{sec:probes}), each agent's own
+saturation fraction and its magnitude are concatenated onto the message before
+consensus, since phase alone cannot tell an agent that a neighbour's actuator
+has stopped responding.
+
+\paragraph{Phase-locked action head (the full \texttt{mocca} architecture)}
+For retained mode $r$ with consensus phasor $(\hat\phi_r^{\cos}, \hat\phi_r^{\sin})$,
+the head emits a gain $A_r \in [-1,1]$ and a phase offset via a unit vector
+$(\cos\psi_r, \sin\psi_r)$, and acts by rotating the phasor:
+\begin{equation}
+\rho_r = \hat\phi_r^{\cos}\cos\psi_r - \hat\phi_r^{\sin}\sin\psi_r, \qquad
+a_k = \tanh\!\left(u + \sum_{r=1}^{R} A_r\, \rho_r\right),
+\label{eq:phaselocked}
+\end{equation}
+where $u$ is an additional broadband channel from the same latent. The resonant
+term is \emph{added} to $u$ rather than replacing it, which makes
+\eqref{eq:phaselocked} a strict generalisation of the plain head: setting every
+$A_r$ to zero recovers an unconstrained policy exactly. An earlier version of
+this head replaced $u$ instead of adding to it, which turns a resonant prior
+into a restriction, and that version scored worse than removing the head
+entirely --- the version reported as \texttt{mocca\_nohead} in
+Table~\ref{tab:ablation-arch} is the trunk and consensus without this head, i.e.\
+with the plain $\tanh(\mathrm{MLP})$ output shown at the top of
+Figure~\ref{fig:architecture}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\textwidth]{figures/fig_architecture.pdf}
+\caption{The policy network. Grey boxes and the plain head are present in every
+variant; the pink boxes and the phase-locked head are the mechanisms ablated in
+Table~\ref{tab:ablation-arch}, so \texttt{recurrent\_only} keeps the encoder but
+not consensus or the head, \texttt{mocca\_nohead} keeps the encoder and
+consensus but ends in the plain head, and \texttt{mocca} is the full diagram.}
+\label{fig:architecture}
+\end{figure}
+
+\paragraph{Critic and exploration}
+The critic is a separate two-layer MLP that by default takes the same
+per-agent input as the actor; a fully centralised critic (fed the true modal
+state instead) was tried and made no measurable difference, consistent with
+this being a dense-reward, low-partial-observability credit problem rather than
+one where value estimation is the bottleneck, so we do not report it as a
+separate row. Every head, plain or phase-locked, has its final layer scaled by
+$0.01$ at initialisation (Table~\ref{tab:params-ppo}) so a fresh policy is
+close to a no-op, which is what makes the residual variants of
+Section~\ref{sec:results} well-posed from the first update rather than starting
+by fighting the base controller. Actions are Gaussian with a learned,
+state-independent log-standard-deviation shared across agents --- the quantity
+swept in Section~\ref{sec:exploration}.
 
 \section{Experimental design}
 \label{sec:design}
@@ -568,6 +738,28 @@ effect sizes and significance rather than means alone.
 
 \section{Results}
 \label{sec:results}
+
+Before the aggregate numbers, Figure~\ref{fig:timedomain} shows what a single
+trial they are computed from actually looks like: the same
+\SI{5}{\centi\metre} pluck at $U/\Uf=1.10$ under open loop, local rate
+feedback, and centralised LQR, sharing axes. Open loop grows into the
+divergence stop within \SI{0.93}{\second}. Local rate feedback neither grows
+nor decays --- it holds a bounded, undamped oscillation rather than suppressing
+it, which is the signature of a controller that reacts to local motion without
+ever engaging the coupled flutter mode. Centralised LQR removes six orders of
+magnitude of structural energy within \SI{1.5}{\second}. Every entry in
+Table~\ref{tab:main} is a decay rate fitted to a trace of exactly this shape,
+at one of nine flight and failure conditions.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\textwidth]{figures/fig_timedomain.pdf}
+\caption{Tip plunge (top) and structural energy (bottom, log scale) for the
+same initial pluck under three of the five classical rungs. Local rate feedback
+neither grows nor decays: it damps local motion but never engages the unstable
+mode, which Section~\ref{sec:phase} confirms directly.}
+\label{fig:timedomain}
+\end{figure}
 
 \begin{table}[t]
 \centering
@@ -790,6 +982,101 @@ the damping authority required. Scale the exploration to it. On this problem tha
 single number mattered more than every algorithmic choice we made, and it is
 cheap to check.
 
+\section{Additional probes}
+\label{sec:probes}
+
+The results above are held to a fixed standard: six seeds, Welch's $t$-test,
+Cohen's $d$. Four further questions arose directly out of those results and
+were checked, but only at one or two seeds each --- not because the questions
+matter less, but because reaching the main standard for every question this
+study raised would have multiplied its cost several times over. We report them
+as probes rather than findings: Table~\ref{tab:probes} gives every seed
+individually rather than a mean, so that no reader mistakes a two-point spread
+for an estimated standard deviation.
+
+\begin{table}[t]
+\centering
+\caption{Additional probes, one or two seeds each, at $\sigma=0.05$. Every
+healthy-decay value is listed per seed, not averaged, because two points do not
+estimate a standard deviation. \texttt{-{}-} marks a probe not run for that
+variant.}
+\label{tab:probes}
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.6cm}l>{\raggedright\arraybackslash}p{3.4cm}c@{}}
+\toprule
+Probe & Variant & Healthy decay [1/s], per seed & Held \\
+\midrule
+\multicolumn{4}{@{}p{0.97\linewidth}@{}}{\emph{No credit decomposition at all (cf.\ Section~\ref{sec:log})}} \\
+naive shared reward & \texttt{ippo\_shared} & $+0.535$ (1 seed) & 4/9 \\
+\addlinespace
+\multicolumn{4}{@{}p{0.97\linewidth}@{}}{\emph{Do the negative mechanisms of Table~\ref{tab:ablation-arch} also hurt as a residual correction?}} \\
+residual + raw comm. & \texttt{residual\_comm} & $-0.697,\ -0.247$ & 6/9, 6/9 \\
+residual + health-channel consensus & \texttt{residual\_health} & $-0.518,\ -0.066$ & 5/9, 5/9 \\
+\addlinespace
+\multicolumn{4}{@{}p{0.97\linewidth}@{}}{\emph{Does supervising the encoder on the true modal phasor help (Section~\ref{sec:phasor-encoder})?}} \\
+supervised encoder, plain head & \texttt{aux\_encoder} & $-0.219,\ -0.029$ & 5/9, 5/9 \\
+supervised encoder, residual & \texttt{aux\_residual} & $-0.431,\ -0.510$ & 5/9, 5/9 \\
+\addlinespace
+\multicolumn{4}{@{}p{0.97\linewidth}@{}}{\emph{Eight-surface scaling (cf.\ Section~\ref{sec:ablations})}} \\
+consensus, plain head, $K{=}8$ & \texttt{mocca\_nohead} & $-0.028,\ -0.015$ & 9/9, 8/9 \\
+recurrent only, $K{=}8$ & \texttt{recurrent\_only} & $+0.135,\ -0.011$ & 9/9, 9/9 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{A shared reward with no credit decomposition at all fails outright}
+One run of \texttt{ippo\_shared} --- every agent receiving the same team reward,
+no per-agent term, no communication --- reached $+0.535\,\mathrm{s}^{-1}$
+(growing) and held only four of six feasible conditions. This is the
+comparison Proposition~\ref{prop:diff} exists to avoid needing: it is the
+variant the closed-form credit replaces, not a rung we tuned. A single seed
+cannot support a significance claim, but the direction and magnitude are
+consistent with every credit-bearing variant in Table~\ref{tab:ablation-credit}
+scoring at least $-0.566$, and we would be surprised by a seed that reversed it.
+
+\paragraph{The negative architecture result survives moving to a residual policy}
+The plain-policy ablation (Table~\ref{tab:ablation-arch}) found that consensus
+and raw neighbour sharing hurt. Applying the same two mechanisms to a policy
+that corrects a decentralised LQG base law instead of replacing it --- the
+setting where \texttt{residual\_only} is the strongest result in the paper at
+$-1.53\,\mathrm{s}^{-1}$ (Section~\ref{sec:results}) --- gives
+\texttt{residual\_comm} at $-0.697$ and $-0.247$ and \texttt{residual\_health}
+at $-0.518$ and $-0.066$: both clearly below \texttt{residual\_only}, at both
+seeds. The negative result is not an artefact of the specific plain-policy
+setting it was first measured in.
+
+\paragraph{Supervising the encoder on ground truth does not help}
+\texttt{aux\_encoder} adds a loss term supervising the phasor encoder directly
+on the true modal phasor --- privileged information, unavailable outside
+simulation --- rather than letting the encoder's representation be shaped
+purely by the RL objective. Both seeds ($-0.219$, $-0.029$) sit below the
+un-supervised \texttt{mocca\_nohead} result of $-0.308\pm0.169$
+(Table~\ref{tab:ablation-arch}), and the residual counterpart
+\texttt{aux\_residual} ($-0.431$, $-0.510$) sits far below
+\texttt{residual\_only}'s $-1.53$. We read this as mild evidence that the
+credit signal already supplies what the encoder needs to represent, and that
+an additional supervised loss competes with, rather than complements, the
+policy gradient here --- consistent with the broader pattern in
+Table~\ref{tab:ablation-arch} that mechanisms motivated by the physics did not
+survive contact with this specific plant and reward.
+
+\paragraph{Eight surfaces changes what ``held'' means, not just how many}
+Section~\ref{sec:ablations} reported that all nine evaluation conditions become
+feasible for the learned policies at eight surfaces, and Table~\ref{tab:probes}
+gives the numbers behind that sentence. They deserve a more careful reading
+than ``held'' alone provides: \texttt{mocca\_nohead} holds nine of nine and
+eight of nine conditions, but at a healthy-condition decay rate of only
+$-0.028$ and $-0.015$ --- an order of magnitude weaker than the three-surface
+result for the same architecture. \texttt{recurrent\_only} holds every
+condition at both seeds, yet one seed's healthy-condition decay is
+\emph{positive} ($+0.135$). ``Held'' in Table~\ref{tab:probes} means the
+episode did not cross the divergence threshold within its duration, not that
+the wing was driven to a decisively damped state; a bounded, barely-growing
+oscillation can hold a condition by this criterion without being a controller
+we would recommend. We stand by the qualitative claim that eight-surface
+architectures fail less catastrophically than three-surface ones, and retract
+any stronger reading of it than that.
+
 \section{Discussion}
 \label{sec:discussion}
 
@@ -830,9 +1117,13 @@ result would need. A plausible interpretation is that a three-surface, six-metre
 wing with broadcast air data is simply too small a coordination problem for an
 explicit channel to earn its bandwidth cost in gradient-fitting difficulty, and
 the eight-surface result --- where every condition becomes feasible for the
-learned policies --- is at least consistent with that story, though we did not
-run it to the statistical standard we hold the main claims to
-(\ref{sec:limitations}). We would read our result as a caution against building
+learned policies, albeit with weak nominal damping (Section~\ref{sec:probes})
+--- is at least consistent with that story, though we did not run it to the
+statistical standard we hold the main claims to. The residual-policy probes in
+Section~\ref{sec:probes} extend the same caution: neither raw neighbour
+sharing nor a health-carrying consensus message helps a residual correction any
+more than they helped the plain policy. We would read our result as a caution
+against building
 communication machinery into a distributed controller by default, on the
 strength of a physical argument, without first checking whether a plain policy
 with the same credit signal already does the job.
@@ -865,8 +1156,9 @@ in $B$ is untested.
 \item Proposition~\ref{prop:diff} concerns the difference reward, not optimality
 of the resulting policy.
 \item Ablations use six seeds for the credit comparison and six for the
-architecture comparison, on a three-surface wing. The eight-surface results are
-suggestive and were not run to the same standard.
+architecture comparison, on a three-surface wing. The eight-surface results,
+and the three further questions in Section~\ref{sec:probes}, are one- and
+two-seed probes and are not run to the same standard.
 \item The exploration finding is established on this plant and this algorithm. We
 expect it to generalise to control tasks whose useful actuation band is narrow
 relative to the action range, but have not shown that.
@@ -888,9 +1180,22 @@ computable in advance from a classical design. On this problem it mattered more
 than any algorithmic choice we made, and we suspect that is true of active
 vibration control more broadly.
 
+\section*{CRediT authorship contribution statement}
+The authors jointly contributed to conceptualisation, methodology, software,
+validation, formal analysis, investigation, writing, and review.
+
+\section*{Declaration of competing interest}
+The authors declare that they have no known competing financial interests or
+personal relationships that could have appeared to influence the work reported
+in this paper.
+
 \section*{Code and data availability}
 The plant, baselines, training code, evaluation harness and the SHARPy
-cross-validation scripts are available at the project repository.
+cross-validation scripts are available at the project repository, including
+\texttt{scripts/animate\_flutter.py}, which regenerates the animations
+referenced in Section~\ref{sec:filmstrip} for the four classical cases (open
+loop, centralised LQR, local rate feedback, and centralised LQR with the
+outboard surface jammed) at the flight condition used throughout the paper.
 
 \appendix
 
@@ -930,7 +1235,7 @@ Air density (sea level) & \SI{1.225}{\kilo\gram\per\cubic\metre} \\
 \caption{Control surface, actuator and sensing parameters (identical for all
 three surfaces).}
 \label{tab:params-actuator}
-\begin{tabular}{lr}
+\begin{tabular}{@{}lp{6.0cm}@{}}
 \toprule
 Parameter & Value \\
 \midrule
@@ -961,7 +1266,7 @@ input, so the parameter count does not grow with the number of surfaces.
 \centering
 \caption{PPO and network hyperparameters.}
 \label{tab:params-ppo}
-\begin{tabular}{lr}
+\begin{tabular}{@{}lp{5.6cm}@{}}
 \toprule
 Hyperparameter & Value \\
 \midrule
@@ -986,6 +1291,129 @@ Action-head output-layer gain (init.) & 0.01 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\section{Compute and reproducibility}
+\label{app:compute}
+
+Every learned variant in this paper trains for $1.5{\times}10^6$ environment
+steps across 128 vectorised environments (Table~\ref{tab:params-ppo}) on a
+single NVIDIA RTX 5000 Ada (laptop) GPU, using PyTorch 2.6. Across the 86
+training runs behind the main results and ablations
+(Tables~\ref{tab:main}--\ref{tab:ablation-arch}), median wall-clock training
+time is \SI{331}{\second} (minimum \SI{246}{\second} for a plain policy,
+maximum \SI{1115}{\second} for the full \texttt{mocca} architecture, whose
+GRU encoder and consensus rounds are the most expensive forward pass in the
+ablation set), at a median throughput of
+$4.5{\times}10^3$ environment steps per second --- the batched environment of
+Section~\ref{sec:design} rather than the network is the bottleneck at this
+scale, since the plant assembly in \eqref{eq:eom} is vectorised across
+environments but not across agents. The full set of runs reported in this paper --- the credit and architecture
+ablations, the eight-surface scaling probe, and every additional probe in
+Section~\ref{sec:probes} --- totals \SI{12.7}{\hour} of GPU time; no result in
+this paper required infrastructure beyond a single workstation GPU.
+
+\section{Baseline controller synthesis}
+\label{app:baselines}
+
+This appendix gives the synthesis equations behind every rung of the ladder in
+Section~\ref{sec:design}, so that ``discrete-time LQG on local accelerometers''
+is reproducible from the paper alone rather than only from the repository.
+
+\subsection{Augmented, discretised plant}
+
+Actuator lag is part of the design plant, not an unmodelled disturbance added
+afterwards: with $z=[q,\dot q, x_{\mathrm{w}}, \delta]$ (the state of
+\eqref{eq:eom} augmented with the deflections) and first-order servo lag of
+time constant $\tau_k$ per surface,
+\begin{equation}
+\dot z = \tilde A z + \tilde B u, \qquad
+\tilde A = \begin{bmatrix} A & B \\ 0 & -\mathrm{diag}(\tau_k^{-1}) \end{bmatrix},
+\quad
+\tilde B = \begin{bmatrix} 0 \\ \mathrm{diag}(\tau_k^{-1}) \end{bmatrix},
+\label{eq:augplant}
+\end{equation}
+where $A,B$ are the plant matrices of \eqref{eq:eom} in state-space form and
+$u\in[-1,1]^K$ is the normalised command. Every controller in this study is
+synthesised in discrete time at the \SI{200}{\hertz} control rate via the exact
+zero-order-hold discretisation
+\begin{equation}
+\begin{bmatrix} \Phi & \Gamma \\ 0 & I \end{bmatrix}
+= \exp\!\left( \begin{bmatrix} \tilde A & \tilde B \\ 0 & 0 \end{bmatrix} \Delta t \right),
+\label{eq:zoh}
+\end{equation}
+giving $z_{t+1} = \Phi z_t + \Gamma u_t$. Designing in continuous time and
+integrating the resulting gain with a forward-Euler step at $\Delta t=\SI{5}{ms}$
+is not a minor approximation here: the wake states have $|\lambda|$ up to
+$\sim\!\SI{1.3e4}{\radian\per\second}$, so $\Delta t\,|\lambda|\approx 63$, and
+the observer built that way is unstable regardless of how good its gain is.
+
+\subsection{LQR gain}
+
+The state cost weights physical structural energy rather than an arbitrary
+diagonal, plus a light penalty on held deflection so the optimum does not park
+surfaces at the travel limit:
+\begin{equation}
+Q = \begin{bmatrix} K_{\mathrm{modal}} & & \\ & M_{\mathrm{modal}} & \\ & & \mathrm{diag}\!\left(w_{\mathrm{rate}}/\delta_{\max,k}^2\right) \end{bmatrix},
+\qquad
+R = \mathrm{diag}\!\left(w_{\mathrm{effort}}/\delta_{\max,k}^2\right),
+\label{eq:lqrcost}
+\end{equation}
+with $w_{\mathrm{effort}}=2{\times}10^4$, $w_{\mathrm{rate}}=10^2$ throughout.
+The discrete-time algebraic Riccati equation
+\begin{equation}
+P = \Phi^{\!\top} P \Phi - \Phi^{\!\top} P \Gamma \left(R+\Gamma^{\!\top} P \Gamma\right)^{-1} \Gamma^{\!\top} P \Phi + Q
+\label{eq:dare}
+\end{equation}
+gives the gain $\mathcal{K}=(R+\Gamma^{\!\top} P \Gamma)^{-1}\Gamma^{\!\top} P \Phi$
+and command $u_t=-\mathcal{K} z_t$ \citep{anderson2007optimal}.
+\texttt{BatchedLQR} solves \eqref{eq:dare} once at a fixed design speed;
+\texttt{BatchedScheduledLQR} solves it on a \SI{9}{}-point airspeed grid over
+the evaluation envelope and linearly interpolates $\mathcal{K}$ between grid
+points; \texttt{BatchedJamAwareLQR} additionally zeros the failed surface's
+column of $\Gamma$ per failure hypothesis and resolves \eqref{eq:dare} for each
+hypothesis on the same grid, so the surviving surfaces' gains already account
+for the loss rather than compensating for it reactively.
+
+\subsection{Local rate feedback}
+
+The floor of the ladder uses no plant model: with $\dot h_k,\dot\alpha_k$ the
+locally sensed plunge and twist rate at surface $k$'s own station,
+\begin{equation}
+u_k = -\left(g_h\,\dot h_k + g_\alpha\,\dot\alpha_k\right), \qquad g_h=0.35,\ g_\alpha=0.9,
+\label{eq:ratefeedback}
+\end{equation}
+clipped to $[-1,1]$.
+
+\subsection{Steady-state Kalman observer on local accelerometers}
+
+The centralised and decentralised LQG rungs replace the true state $z_t$ in
+$u_t=-\mathcal{K}\hat z_t$ with an estimate driven only by the accelerometer
+channels the agents themselves observe, $y_t = H z_t$, where $H$ is built from
+the acceleration rows of the plant rather than a selection matrix, since an
+accelerometer measures $\ddot q$, an algebraic function of the state rather
+than a state itself. The steady-state predictor-form filter is
+\begin{align}
+\Sigma &= \Phi\Sigma\Phi^{\!\top} + W
+- \Phi\Sigma H^{\!\top}\!\left(H\Sigma H^{\!\top}+V\right)^{-1}\! H\Sigma\Phi^{\!\top},
+\label{eq:kalmanriccati} \\
+L &= \Phi\Sigma H^{\!\top}\!\left(H\Sigma H^{\!\top}+V\right)^{-1}, \\
+\hat z_{t+1} &= \Phi\hat z_t + \Gamma u_t + L\left(y_t - H\hat z_t\right),
+\label{eq:kalmanupdate}
+\end{align}
+with process noise $W=10^{-4}I$ and measurement noise
+$V=10^{-6}\,\mathrm{diag}(\lVert H_i\rVert^2)$ scaled per-channel, since
+accelerometer rows of $H$ have norms of order $10^4$--$10^5$ and an unscaled
+$V$ demands impossible measurement precision and drives $L$ to blow up
+\citep{anderson2007optimal}. \texttt{BatchedLQG} solves
+\eqref{eq:kalmanriccati}--\eqref{eq:kalmanupdate} once with $H$ built from all
+six channels and $\mathcal{K}$ commanding all three surfaces jointly, on the
+same speed grid as the scheduled LQR. \texttt{BatchedDecentralizedLQG} solves
+an \emph{independent} instance of
+\eqref{eq:kalmanriccati}--\eqref{eq:kalmanupdate} per surface $k$, with $H$
+restricted to $k$'s own two accelerometer rows and $\Gamma$ restricted to $k$'s
+own column, so agent $k$'s estimate, gain and command never depend on any
+other surface's measurement or actuation --- the discrete-time, model-based
+analogue of the information structure the learned policies are given.
 
 \bibliographystyle{elsarticle-harv}
 \bibliography{refs,refs_extra}
