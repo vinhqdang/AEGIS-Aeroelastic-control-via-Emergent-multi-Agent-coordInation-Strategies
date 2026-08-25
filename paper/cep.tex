@@ -29,9 +29,7 @@
 \title{What limits reinforcement learning for distributed flutter suppression,
 and the credit structure that helps}
 
-\author[a]{[Author One]}
-\author[a]{[Author Two]}
-\address[a]{[Affiliation to be completed]}
+\author{Anonymous for review}
 
 \begin{abstract}
 Modern flexible wings carry several independently actuated trailing-edge
@@ -1339,11 +1337,11 @@ than any algorithmic choice we made, and we suspect that is true of active
 vibration control more broadly.
 
 \section*{CRediT authorship contribution statement}
-The authors jointly contributed to conceptualisation, methodology, software,
+The author contributed all conceptualisation, methodology, software,
 validation, formal analysis, investigation, writing, and review.
 
 \section*{Declaration of competing interest}
-The authors declare that they have no known competing financial interests or
+The author declares that they have no known competing financial interests or
 personal relationships that could have appeared to influence the work reported
 in this paper.
 
@@ -1565,8 +1563,8 @@ $V$ demands impossible measurement precision and drives $L$ to blow up
 \citep{anderson2007optimal}. \texttt{BatchedLQG} solves
 \eqref{eq:kalmanriccati}--\eqref{eq:kalmanupdate} once with $H$ built from all
 six channels and $\mathcal{K}$ commanding all three surfaces jointly, on the
-same speed grid as the scheduled LQR. \texttt{BatchedDecentralizedLQG} solves
-an \emph{independent} instance of
+same speed grid as the scheduled LQR. \texttt{Batched\-Decentralized\-LQG}
+solves an \emph{independent} instance of
 \eqref{eq:kalmanriccati}--\eqref{eq:kalmanupdate} per surface $k$, with $H$
 restricted to $k$'s own two accelerometer rows and $\Gamma$ restricted to $k$'s
 own column, so agent $k$'s estimate, gain and command never depend on any
