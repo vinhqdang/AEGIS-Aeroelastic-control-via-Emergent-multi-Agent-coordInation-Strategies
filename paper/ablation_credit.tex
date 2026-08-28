@@ -4,18 +4,27 @@ Variant & Seeds & Decay rate [1/s] & Conditions held \\
 \midrule
 \texttt{ippo\_blended} & 6 & $-1.085 \pm 0.243$ & 5.0/9 \\
 \texttt{ippo\_physics} & 6 & $-0.566 \pm 0.123$ & 5.0/9 \\
+\texttt{ippo\_shared} & 6 & $-0.526 \pm 0.806$ & 4.0/9 \\
 \texttt{shaped\_shared} & 6 & $-0.690 \pm 0.145$ & 4.3/9 \\
+\texttt{vdn\_shared} & 6 & $-1.670 \pm 0.699$ & 1.8/9 \\
 \bottomrule
 \end{tabular}
 
 \vspace{0.5em}
 
-\begin{tabular}{llrr}
+\begin{tabular}{llrrrr}
 \toprule
-Comparison & & Cohen's $d$ & $p$ \\
+Comparison & & Cohen's $d$ & Hedges' $g$ & $p$ & $p_{\mathrm{Holm}}$ \\
 \midrule
-\texttt{ippo\_blended} & vs \texttt{ippo\_physics} & $-2.70$ & $0.0020$$^{*}$ \\
-\texttt{ippo\_blended} & vs \texttt{shaped\_shared} & $-1.97$ & $0.0089$$^{*}$ \\
-\texttt{ippo\_physics} & vs \texttt{shaped\_shared} & $0.93$ & $0.1400$ \\
+\texttt{ippo\_blended} & vs \texttt{ippo\_physics} & $-2.69$ & $-2.49$ & $0.0020$ & $0.0198$$^{*}$ \\
+\texttt{ippo\_blended} & vs \texttt{ippo\_shared} & $-0.94$ & $-0.87$ & $0.1557$ & $0.5683$ \\
+\texttt{ippo\_blended} & vs \texttt{shaped\_shared} & $-1.97$ & $-1.82$ & $0.0088$ & $0.0795$ \\
+\texttt{ippo\_blended} & vs \texttt{vdn\_shared} & $1.12$ & $1.03$ & $0.0996$ & $0.4980$ \\
+\texttt{ippo\_physics} & vs \texttt{ippo\_shared} & $-0.07$ & $-0.06$ & $0.9078$ & $1.0000$ \\
+\texttt{ippo\_physics} & vs \texttt{shaped\_shared} & $0.92$ & $0.85$ & $0.1421$ & $0.5683$ \\
+\texttt{ippo\_physics} & vs \texttt{vdn\_shared} & $2.20$ & $2.03$ & $0.0112$ & $0.0895$ \\
+\texttt{ippo\_shared} & vs \texttt{shaped\_shared} & $0.28$ & $0.26$ & $0.6426$ & $1.0000$ \\
+\texttt{ippo\_shared} & vs \texttt{vdn\_shared} & $1.52$ & $1.40$ & $0.0257$ & $0.1543$ \\
+\texttt{shaped\_shared} & vs \texttt{vdn\_shared} & $1.94$ & $1.79$ & $0.0177$ & $0.1240$ \\
 \bottomrule
 \end{tabular}

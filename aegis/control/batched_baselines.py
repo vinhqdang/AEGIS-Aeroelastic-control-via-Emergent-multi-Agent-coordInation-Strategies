@@ -1,7 +1,7 @@
 """Classical baselines that run on the batched environment.
 
 The baseline ladder matters more than the proposed method here, because a weak
-baseline is how a paper gets desk-rejected. Four rungs, in order of how hard
+baseline is how a paper gets desk-rejected. Six rungs, in order of how hard
 they are to beat and how implementable they are:
 
 1. :class:`BatchedLocalFeedback` -- collocated rate feedback, no communication.
@@ -22,6 +22,10 @@ they are to beat and how implementable they are:
    is the correct classical comparison for a distributed learned policy, because
    decentralisation always costs performance and comparing against a centralised
    controller confounds the method with the information structure.
+6. :class:`BatchedRobustDecentralizedLQG` -- the same design re-tuned for
+   control-authority margin, so that a divergence at the top of the envelope
+   cannot be dismissed as an artefact of the specific LQR weights chosen for
+   rung 5, without actually asserting or assuming that it isn't.
 
 Rung 4 exists because comparing a learned policy that uses local accelerometers
 against an LQR handed the exact modal state and the wake states would be a
@@ -480,6 +484,7 @@ class BatchedDecentralizedLQG:
         rate_weight: float = 1.0e2,
         process_noise: float = 1.0e-4,
         measurement_noise: float = 1.0e-6,
+        ltr_rho: float = 0.0,
     ):
         self.model = model
         self.n_surfaces = model.wing.n_surfaces
@@ -488,7 +493,12 @@ class BatchedDecentralizedLQG:
         self._travel = np.asarray([s.max_deflection for s in model.wing.surfaces])
 
         # Per agent: a gain that may only use its own column, and an observer
-        # that may only use its own two measurement rows.
+        # that may only use its own two measurement rows. ``ltr_rho`` > 0 boosts
+        # the observer's process-noise weighting by rho * (own column outer
+        # product) -- Kalman-filter loop transfer recovery (Doyle & Stein 1979):
+        # as rho grows the filter loop is pushed toward the full-state LQR loop
+        # shape, buying back the guaranteed gain/phase margins an unstructured
+        # LQG otherwise lacks, at the cost of noise rejection.
         self.gains, self.observer_gains = [], []
         self.transitions, self.inputs, self.measurements = [], [], []
         for agent in range(self.n_surfaces):
@@ -512,16 +522,37 @@ class BatchedDecentralizedLQG:
                         reduced_input.T @ riccati @ transition,
                     )
                 )
-                observers.append(
-                    _discrete_observer_gain(
-                        model,
-                        speed,
-                        control_dt,
-                        local_measurement,
-                        process_noise,
-                        measurement_noise,
+                if ltr_rho > 0.0:
+                    column = reduced_input[:, agent : agent + 1]
+                    dimension = transition.shape[0]
+                    noise_w = process_noise * np.eye(dimension) + ltr_rho * (
+                        column @ column.T
                     )
-                )
+                    row_scale = np.linalg.norm(local_measurement, axis=1) ** 2
+                    noise_v = measurement_noise * np.diag(row_scale)
+                    covariance = solve_discrete_are(
+                        transition.T, local_measurement.T, noise_w, noise_v
+                    )
+                    innovation = (
+                        local_measurement @ covariance @ local_measurement.T + noise_v
+                    )
+                    observers.append(
+                        transition
+                        @ covariance
+                        @ local_measurement.T
+                        @ np.linalg.inv(innovation)
+                    )
+                else:
+                    observers.append(
+                        _discrete_observer_gain(
+                            model,
+                            speed,
+                            control_dt,
+                            local_measurement,
+                            process_noise,
+                            measurement_noise,
+                        )
+                    )
                 transitions.append(transition)
                 inputs.append(reduced_input)
                 measurements.append(local_measurement)
@@ -578,3 +609,59 @@ class BatchedDecentralizedLQG:
             self._estimates[agent] = np.clip(np.nan_to_num(updated), -1e8, 1e8)
 
         return np.clip(command / self._travel, -1.0, 1.0)
+
+
+class BatchedRobustDecentralizedLQG(BatchedDecentralizedLQG):
+    """:class:`BatchedDecentralizedLQG` re-tuned for control-authority margin.
+
+    Identical structure and identical implementability (own two accelerometers,
+    own actuator, no communication) -- only the LQR cost weighting differs. This
+    answers "an unstructured LQG has no guaranteed margin, add a robust rung"
+    with a real classical answer rather than an assumption, and the answer is
+    not the one first expected.
+
+    ``scripts/robust_baseline_check.py`` checked loop transfer recovery (Doyle &
+    Stein 1979: boost the observer's process-noise weighting toward the
+    full-state loop shape) first, since that is the standard remedy for
+    observer-induced margin loss in an LQG design. It has *no* effect on this
+    plant's control-authority margin at any tested ``ltr_rho``, because the
+    bottleneck here is not the observer: the same script shows the fully
+    state-fed (no-observer-at-all) decentralised loop already loses stability
+    at almost exactly the same authority scale as the full LQG does. LTR
+    recovers a loop *toward* the state-feedback loop's own shape, and that
+    loop's margin is the actual limit, so there is nothing left to recover.
+
+    What does move the margin -- modestly -- is the LQR cost weighting itself:
+    a 50x increase in the effort weight (``2e4`` to ``1e6``, "cheap" to
+    "expensive" control) raises the control-authority-loss margin from 0.158 to
+    0.179 and then plateaus, at a measurable cost to nominal decay rate. That a
+    50x retuning buys back so little is itself the finding: the fragility this
+    baseline has at the top of the envelope is structural to decentralised
+    control there, not an artifact of an under-tuned weight choice, which is
+    the honest answer to whether the envelope-edge comparison in Section
+    (results) is confounded by a weak baseline.
+    """
+
+    name = "dlqg_robust"
+
+    def __init__(
+        self,
+        model: AeroelasticModel,
+        speed_range: tuple[float, float],
+        control_dt: float,
+        effort_weight: float = 1.0e6,
+        rate_weight: float = 1.0e2,
+        process_noise: float = 1.0e-4,
+        measurement_noise: float = 1.0e-6,
+        ltr_rho: float = 0.0,
+    ):
+        super().__init__(
+            model,
+            speed_range,
+            control_dt,
+            effort_weight=effort_weight,
+            rate_weight=rate_weight,
+            process_noise=process_noise,
+            measurement_noise=measurement_noise,
+            ltr_rho=ltr_rho,
+        )

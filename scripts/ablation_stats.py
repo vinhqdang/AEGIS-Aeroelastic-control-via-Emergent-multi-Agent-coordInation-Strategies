@@ -7,8 +7,13 @@ difference being claimed. Any ablation on this task needs a seed count and a
 test, or it is noise interpretation.
 
 Reports mean, standard deviation, Welch t-tests (unequal variances, since the
-variants have visibly different spread) and Cohen's d for every pair, plus a
-LaTeX table for the manuscript.
+variants have visibly different spread), Cohen's d, and Hedges' g (the
+small-sample-bias-corrected effect size -- d has a known positive bias of
+order 1/(4n) at n=6 per group) for every pair, plus a Holm-Bonferroni-corrected
+p-value across every pairwise test actually run in one invocation (a review
+flagged that quoting a dozen-plus uncorrected pairwise p-values without any
+multiple-comparison correction overstates significance), plus a LaTeX table for
+the manuscript.
 
 Usage::
 
@@ -48,17 +53,40 @@ def main() -> None:
         difference = left.mean() - right.mean()
         pooled = np.sqrt((left.var(ddof=1) + right.var(ddof=1)) / 2.0)
         effect = difference / pooled if pooled > 0 else np.nan
-        rows.append((first, second, difference, effect, pvalue))
-        marker = "  SIGNIFICANT" if pvalue < 0.05 else ""
+        n1, n2 = left.size, right.size
+        hedges_correction = 1.0 - 3.0 / (4.0 * (n1 + n2) - 9.0) if n1 + n2 > 2 else np.nan
+        hedges_g = effect * hedges_correction
+        rows.append([first, second, difference, effect, hedges_g, pvalue, None])
+        del statistic
+
+    _holm_bonferroni(rows)
+
+    for first, second, difference, effect, hedges_g, pvalue, adjusted in rows:
+        marker = "  SIGNIFICANT (Holm)" if adjusted < 0.05 else ""
         print(
             f"  {first:18s} vs {second:18s}  diff {difference:+6.3f}  "
-            f"d {effect:+5.2f}  p = {pvalue:.4f}{marker}"
+            f"d {effect:+5.2f}  g {hedges_g:+5.2f}  p = {pvalue:.4f}  "
+            f"p_holm = {adjusted:.4f}{marker}"
         )
-        del statistic
 
     if args.out:
         _write_latex(Path(args.out), groups, rows)
         print(f"\nwrote {args.out}")
+
+
+def _holm_bonferroni(rows: list[list]) -> None:
+    """Step-down Holm-Bonferroni correction, in place, over rows[i][5] (pvalue)
+    into rows[i][6] (adjusted). Standard, monotone-enforced Holm procedure:
+    the k-th smallest of m p-values is inflated by (m - k + 1), then adjusted
+    upward as needed so adjusted p-values are non-decreasing in sorted order.
+    """
+    m = len(rows)
+    order = sorted(range(m), key=lambda i: rows[i][5])
+    running_max = 0.0
+    for rank, index in enumerate(order):
+        inflated = (m - rank) * rows[index][5]
+        running_max = max(running_max, inflated)
+        rows[index][6] = min(1.0, running_max)
 
 
 def _load(runs: Path) -> dict[str, tuple[np.ndarray, np.ndarray]]:
@@ -102,17 +130,18 @@ def _write_latex(path: Path, groups, rows) -> None:
         )
     lines += [r"\bottomrule", r"\end{tabular}", "", r"\vspace{0.5em}", ""]
     lines += [
-        r"\begin{tabular}{llrr}",
+        r"\begin{tabular}{llrrrr}",
         r"\toprule",
-        r"Comparison & & Cohen's $d$ & $p$ \\",
+        r"Comparison & & Cohen's $d$ & Hedges' $g$ & $p$ & $p_{\mathrm{Holm}}$ \\",
         r"\midrule",
     ]
-    for first, second, _, effect, pvalue in rows:
-        star = r"$^{*}$" if pvalue < 0.05 else ""
+    for first, second, _, effect, hedges_g, pvalue, adjusted in rows:
+        star = r"$^{*}$" if adjusted < 0.05 else ""
         lines.append(
             f"\\texttt{{{first.replace('_', chr(92) + '_')}}} & "
             f"vs \\texttt{{{second.replace('_', chr(92) + '_')}}} & "
-            f"${effect:.2f}$ & ${pvalue:.4f}${star} \\\\"
+            f"${effect:.2f}$ & ${hedges_g:.2f}$ & ${pvalue:.4f}$ & "
+            f"${adjusted:.4f}${star} \\\\"
         )
     lines += [r"\bottomrule", r"\end{tabular}"]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

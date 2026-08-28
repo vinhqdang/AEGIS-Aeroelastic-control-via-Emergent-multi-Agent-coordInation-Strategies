@@ -64,12 +64,20 @@ class Variant:
     residual_authority: float = 1.0
     use_health_channel: bool = False
     aux_coefficient: float = 0.0
+    decompose_value: bool = False
 
 
 VARIANTS: dict[str, Variant] = {
     "ippo_shared": Variant(
         "ippo_shared", "shared", "none", False, False, False,
         "naive baseline: one global reward, no communication",
+    ),
+    "vdn_shared": Variant(
+        "vdn_shared", "shared", "none", False, False, False,
+        "value-decomposition credit: decentralised V_i summed to the team "
+        "value and fit to the shared reward, vs. the naive equal-share "
+        "baseline above",
+        decompose_value=True,
     ),
     "mappo_shared": Variant(
         "mappo_shared", "shared", "none", False, False, True,
@@ -206,6 +214,7 @@ def _run_one(variant: Variant, seed: int, args, outdir: Path) -> None:
             initial_log_std=args.log_std,
             entropy_coefficient=args.entropy,
             seed=seed,
+            decompose_value=variant.decompose_value,
         ),
     )
 

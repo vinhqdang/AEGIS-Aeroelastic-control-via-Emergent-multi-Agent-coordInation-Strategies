@@ -29,6 +29,7 @@ from aegis.control.batched_baselines import (
     BatchedLocalFeedback,
     BatchedLQG,
     BatchedLQR,
+    BatchedRobustDecentralizedLQG,
     BatchedScheduledLQR,
 )
 from aegis.envs.flutter_marl import EnvConfig
@@ -45,6 +46,7 @@ BASELINE_LABELS = {
     "lqr_sched": "LQR, gain-scheduled",
     "lqg_local": "LQG, centralised, local sensing",
     "dlqg_local": "LQG, fully decentralised",
+    "dlqg_robust": "LQG, decentralised, effort-reweighted for margin",
     "lqr_oracle": "LQR, fault-aware oracle",
 }
 
@@ -100,6 +102,7 @@ def main() -> None:
         "lqr_sched": BatchedScheduledLQR(model, speed_range, config.control_dt),
         "lqg_local": BatchedLQG(model, speed_range, config.control_dt),
         "dlqg_local": BatchedDecentralizedLQG(model, speed_range, config.control_dt),
+        "dlqg_robust": BatchedRobustDecentralizedLQG(model, speed_range, config.control_dt),
         "lqr_oracle": BatchedJamAwareLQR(model, speed_range, config.control_dt),
     }
     for key, controller in controllers.items():

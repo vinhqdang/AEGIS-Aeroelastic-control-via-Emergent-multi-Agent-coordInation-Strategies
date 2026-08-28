@@ -116,6 +116,14 @@ class EnvConfig:
 
     reference_tip_plunge: float = 0.05  # sets the observation and reward scales
 
+    # Simulates control-influence identification error for the credit signal
+    # only: the plant is actually driven by the true control-influence matrix,
+    # but the closed-form credit in control_power() is computed as if it were
+    # (1 + credit_identification_error) times that -- i.e. the credit signal is
+    # misinformed while the true dynamics are not. 0 (default) reproduces the
+    # original, uninformed-of-error credit exactly.
+    credit_identification_error: float = 0.0
+
     def __post_init__(self) -> None:
         if self.comm_mode not in COMM_MODES:
             raise ValueError(f"comm_mode must be one of {COMM_MODES}, got {self.comm_mode}")

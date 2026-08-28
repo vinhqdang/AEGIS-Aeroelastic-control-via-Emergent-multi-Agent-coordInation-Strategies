@@ -29,18 +29,18 @@ import numpy as np
 # because the earliest runs predate recording it in the payload; newer runs carry
 # it and are cross-checked against this table on load.
 SIGMA_BY_DIRECTORY = {
-    "runs/v2": 0.30,
-    "runs/sigma_015": 0.15,
-    "runs/fine": 0.05,
-    "runs/sigma_002": 0.02,
-    "runs/finer": 0.01,
+    "runs/exploration_sigma_030": 0.30,
+    "runs/exploration_sigma_015": 0.15,
+    "runs/exploration_sigma_005": 0.05,
+    "runs/exploration_sigma_002": 0.02,
+    "runs/exploration_sigma_001": 0.01,
 }
 VARIANT = "residual_only"
 
 #: RMS deflection used by the classical controllers, as a fraction of travel,
 #: converted to the same normalised action units as sigma.
 USEFUL_AMPLITUDE = 0.007      # centralised LQG, 0.7 per cent of travel
-BASELINE_DECENTRALISED = -2.06
+BASELINE_DECENTRALISED = -2.05
 BASELINE_CENTRALISED = -5.52
 
 
@@ -121,7 +121,7 @@ def _plot(points: dict[float, list[float]], path: Path) -> None:
 
     axes.errorbar(
         sigmas, means, yerr=spread, fmt="o-", color=controller_color(3),
-        capsize=3, lw=1.7, label="learned policy, mean of 2 seeds",
+        capsize=3, lw=1.7, label="learned policy, mean of 6 seeds",
     )
     axes.set_xscale("log")
     axes.set_xlim(USEFUL_AMPLITUDE * 0.8, sigmas.max() * 1.5)

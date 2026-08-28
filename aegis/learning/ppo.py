@@ -75,6 +75,17 @@ class PPOConfig:
     # Fraction of training over which the task ramps from easy to full. 0
     # disables the curriculum.
     curriculum_fraction: float = 0.4
+    # Value-Decomposition-Networks-style credit baseline (Sunehag et al. 2018),
+    # adapted to on-policy actor-critic: each agent keeps its own decentralised
+    # value head V_i(o_i) (unchanged architecture), but the team's summed value
+    # V_tot = sum_i V_i is what is bootstrapped and fit against the (shared)
+    # team return, rather than each V_i independently chasing the full return.
+    # The policy-gradient advantage is then the single team-level advantage,
+    # broadcast to every agent -- credit is decomposed at the value level only,
+    # which is the honest continuous-action, on-policy analogue of VDN: the
+    # method's original credit mechanism (Q_i depends on agent i's own action)
+    # does not carry over cleanly to a state-value critic.
+    decompose_value: bool = False
 
 
 @dataclass
@@ -237,7 +248,20 @@ class PPOTrainer:
             central_state = self._central_state() if central is not None else None
             _, _, last_value, _ = self.policy(observation, hidden, central_state)
 
-        advantages, returns = self._gae(rewards, values, dones, last_value)
+        if config.decompose_value:
+            n_agents_dim = rewards.shape[-1]
+            # All agents observe the same broadcast team reward under
+            # reward_mode="shared"; take one copy rather than summing it.
+            team_reward = rewards[..., :1]
+            team_values = values.sum(dim=-1, keepdim=True)
+            team_last_value = last_value.sum(dim=-1, keepdim=True)
+            team_advantages, team_returns = self._gae(
+                team_reward, team_values, dones, team_last_value
+            )
+            advantages = team_advantages.expand(-1, -1, n_agents_dim)
+            returns = team_returns.expand(-1, -1, n_agents_dim)
+        else:
+            advantages, returns = self._gae(rewards, values, dones, last_value)
         # Time-major throughout: the optimiser slices consecutive segments, so
         # flattening here would destroy the sequence structure it needs.
         batch = {
@@ -369,7 +393,12 @@ class PPOTrainer:
             ratio.clamp(1.0 - config.clip_range, 1.0 + config.clip_range) * advantage
         )
         policy_loss = -torch.min(unclipped, clipped).mean()
-        value_loss = (value - target).pow(2).mean()
+        if config.decompose_value:
+            # V_tot = sum_i V_i is what is fit to the team return -- the VDN
+            # decomposition -- not each agent's V_i independently.
+            value_loss = (value.sum(dim=-1) - target[..., 0]).pow(2).mean()
+        else:
+            value_loss = (value - target).pow(2).mean()
 
         aux_loss = (
             torch.stack(aux_terms).mean()

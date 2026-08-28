@@ -1,0 +1,16 @@
+We retrained the exact-plus-shaping credit variant with the true dynamics held
+fixed and only the credit signal's belief about control authority perturbed by
+a uniform $\pm\SI{60}{\percent}$, three seeds each --- a reduced but
+disclosed seed count, in keeping with this paper's own standard for probes
+that are not held to the six-seed bar. At the unperturbed baseline the healthy
+decay rate is $-0.441\pm0.330$; believing $\SI{60}{\percent}$ more authority
+than is true gives $-0.259\pm0.217$, and believing $\SI{60}{\percent}$ less
+gives $-0.570\pm0.131$. Neither direction collapses performance or reverses
+its sign, and the spread across all three conditions --- including the
+unperturbed one --- is wide enough at three seeds that we do not read a
+monotone trend into the ordering. Both perturbations remain within the range
+where the uniform-scale analysis above predicts no sign reversal
+($\pm\SI{60}{\percent}$ is well short of the $-\SI{100}{\percent}$ boundary),
+so this result should be read as evidence that moderate uniform
+identification error degrades gracefully rather than catastrophically, not as
+a test of what happens past that boundary, which we have not run.

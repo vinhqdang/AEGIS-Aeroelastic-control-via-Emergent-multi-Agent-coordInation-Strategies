@@ -11,15 +11,15 @@ Variant & Seeds & Decay rate [1/s] & Conditions held \\
 
 \vspace{0.5em}
 
-\begin{tabular}{llrr}
+\begin{tabular}{llrrrr}
 \toprule
-Comparison & & Cohen's $d$ & $p$ \\
+Comparison & & Cohen's $d$ & Hedges' $g$ & $p$ & $p_{\mathrm{Holm}}$ \\
 \midrule
-\texttt{comm\_raw} & vs \texttt{mocca} & $-0.93$ & $0.1398$ \\
-\texttt{comm\_raw} & vs \texttt{mocca\_nohead} & $-1.44$ & $0.0336$$^{*}$ \\
-\texttt{comm\_raw} & vs \texttt{recurrent\_only} & $-0.51$ & $0.3961$ \\
-\texttt{mocca} & vs \texttt{mocca\_nohead} & $-0.42$ & $0.4882$ \\
-\texttt{mocca} & vs \texttt{recurrent\_only} & $0.36$ & $0.5452$ \\
-\texttt{mocca\_nohead} & vs \texttt{recurrent\_only} & $0.78$ & $0.2091$ \\
+\texttt{comm\_raw} & vs \texttt{mocca} & $-0.93$ & $-0.86$ & $0.1391$ & $0.6953$ \\
+\texttt{comm\_raw} & vs \texttt{mocca\_nohead} & $-1.44$ & $-1.33$ & $0.0336$ & $0.2018$ \\
+\texttt{comm\_raw} & vs \texttt{recurrent\_only} & $-0.51$ & $-0.47$ & $0.3961$ & $1.0000$ \\
+\texttt{mocca} & vs \texttt{mocca\_nohead} & $-0.41$ & $-0.38$ & $0.4907$ & $1.0000$ \\
+\texttt{mocca} & vs \texttt{recurrent\_only} & $0.36$ & $0.33$ & $0.5444$ & $1.0000$ \\
+\texttt{mocca\_nohead} & vs \texttt{recurrent\_only} & $0.78$ & $0.72$ & $0.2104$ & $0.8414$ \\
 \bottomrule
 \end{tabular}

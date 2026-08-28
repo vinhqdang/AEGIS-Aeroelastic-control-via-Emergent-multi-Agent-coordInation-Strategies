@@ -116,6 +116,7 @@ class BatchedFlutterEnv:
         self._control_matrix = np.zeros((n, self.n_plant, k))
         self._gust_matrix = np.zeros((n, self.n_plant))
         self._force_matrix = np.zeros((n, self.n_modes, k))
+        self._credit_force_matrix = np.zeros((n, self.n_modes, k))
         self._gust_samples: np.ndarray | None = None
         self._episode_return = np.zeros(n)
         self._active = np.ones(n, dtype=bool)
@@ -182,6 +183,9 @@ class BatchedFlutterEnv:
         self._control_matrix[:] = control
         self._gust_matrix[:] = gust
         self._force_matrix[:] = force
+        self._credit_force_matrix[:] = force * (
+            1.0 + self.config.credit_identification_error
+        )
 
         self._plant[:] = 0.0
         self._plant[:, 0] = np.asarray(tip_plunge, dtype=float)
@@ -232,6 +236,9 @@ class BatchedFlutterEnv:
         self._control_matrix[indices] = control
         self._gust_matrix[indices] = gust
         self._force_matrix[indices] = force
+        self._credit_force_matrix[indices] = force * (
+            1.0 + self.config.credit_identification_error
+        )
 
         self._plant[indices] = 0.0
         plunge = self.rng.uniform(*self.config.tip_plunge_range, size=count)
@@ -470,9 +477,17 @@ class BatchedFlutterEnv:
         )
 
     def control_power(self) -> np.ndarray:
-        """Per-agent instantaneous control power, ``(n_envs, n_agents)``."""
+        """Per-agent instantaneous control power used by the credit signal.
+
+        Computed from ``_credit_force_matrix``, which equals the true
+        control-influence matrix unless ``config.credit_identification_error``
+        is non-zero -- in which case this is what the reward *believes* the
+        control influence to be, while the actual dynamics (``_control_matrix``,
+        used in ``_derivative``) are unaffected. This is the hook for the
+        credit-signal identification-error sensitivity study.
+        """
         rate = self._plant[:, self.n_modes : 2 * self.n_modes]
-        return np.einsum("ni,nik->nk", rate, self._force_matrix) * self._deflection
+        return np.einsum("ni,nik->nk", rate, self._credit_force_matrix) * self._deflection
 
     def _rewards(self, previous: np.ndarray) -> np.ndarray:
         energy = self._structural_energy()
