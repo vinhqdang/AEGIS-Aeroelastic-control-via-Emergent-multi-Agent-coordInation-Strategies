@@ -1,0 +1,66 @@
+[Date]
+
+Dear Editor-in-Chief,
+
+We are pleased to submit our manuscript, "Physics-Exact Credit Assignment
+for Multi-Agent Flutter Suppression," for consideration as a Regular
+Article in the Journal of Guidance, Control, and Dynamics.
+
+The paper studies active flutter suppression on a wing with several
+independently actuated trailing-edge surfaces, each commanded by its own
+reinforcement-learning agent from local sensing alone -- the setting a
+physically distributed avionics architecture actually presents, as opposed
+to the single-agent, single-effector, globally-observed setting the
+existing flutter-suppression literature uses throughout. Posing the problem
+this way exposes a credit-assignment question with a physical answer: for
+this class of energy-conserving structural plant, we show that the
+per-agent credit multi-agent reinforcement learning normally has to
+estimate is instead available in closed form directly from the equations of
+motion, and we validate it against a naive undecomposed reward and an
+adapted value-decomposition baseline (Holm-Bonferroni corrected across the
+full comparison family), against a six-rung classical baseline ladder
+(including a fully decentralised LQG synthesised from the same sensing the
+learned agents have), and against an unsteady vortex-lattice solver for the
+underlying plant. A second, more general finding follows from the same
+study: on this problem, the initial policy-exploration scale dominated
+every algorithmic choice we tried, by a factor of two, and is computable in
+advance from a classical design -- a diagnostic we believe generalises to
+other physical control tasks with a narrow useful actuation band. We report
+two negative results (learned communication did not help; a shaping-based
+refinement did not survive correction for multiple comparisons once
+compared against the full family of alternatives) at the same statistical
+standard as the positive ones.
+
+We believe this manuscript is a strong fit for the Journal of Guidance,
+Control, and Dynamics: it is fundamentally a distributed-control and
+credit-assignment contribution, using flutter suppression as a physically
+grounded, validated testbed rather than as an aerodynamics or
+fluid-structure-interaction result in its own right, and it engages
+directly with the certification gap between a learned policy and a
+classical design with a known stability margin, which we discuss explicitly
+in the paper.
+
+This manuscript, in whole or in substantial part, has not previously been
+submitted to any AIAA journal or conference. The corresponding author will
+provide any further disclosure ScholarOne requests. All authors have
+approved the manuscript and agree to its submission. The authors declare no
+conflicts of interest, and no funding was received for this work. Data and
+code needed to reproduce every result are cited in the manuscript's Data and
+Code Availability section.
+
+Thank you for your consideration. We look forward to your response.
+
+Sincerely,
+
+Quang-Vinh Dang (corresponding author)
+British University Vietnam, Hung Yen, Vietnam
+vinh.dq4@buv.edu.vn
+
+Hai Dang Nguyen
+XTECH AI Technology, Ho Chi Minh City, Vietnam
+
+Ngoc Minh La
+Vietnamese German University, Ho Chi Minh City, Vietnam
+
+Minh Ngoc Dinh
+School of Data Science & Information Technology, Millennia University, Ho Chi Minh City, Vietnam
