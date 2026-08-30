@@ -41,26 +41,16 @@ classical design with a known stability margin, which we discuss explicitly
 in the paper.
 
 This manuscript, in whole or in substantial part, has not previously been
-submitted to any AIAA journal or conference. The corresponding author will
-provide any further disclosure ScholarOne requests. All authors have
-approved the manuscript and agree to its submission. The authors declare no
-conflicts of interest, and no funding was received for this work. Data and
-code needed to reproduce every result are cited in the manuscript's Data and
-Code Availability section.
+submitted to any AIAA journal or conference. I will provide any further
+disclosure ScholarOne requests. I declare no conflicts of interest, and no
+funding was received for this work. Data and code needed to reproduce every
+result are cited in the manuscript's Data and Code Availability section.
 
-Thank you for your consideration. We look forward to your response.
+Thank you for your consideration. I look forward to your response.
 
 Sincerely,
 
-Quang-Vinh Dang (corresponding author)
+Quang-Vinh Dang
+Senior Lecturer, School of Computing
 British University Vietnam, Hung Yen, Vietnam
 vinh.dq4@buv.edu.vn
-
-Hai Dang Nguyen
-XTECH AI Technology, Ho Chi Minh City, Vietnam
-
-Ngoc Minh La
-Vietnamese German University, Ho Chi Minh City, Vietnam
-
-Minh Ngoc Dinh
-School of Data Science & Information Technology, Millennia University, Ho Chi Minh City, Vietnam
