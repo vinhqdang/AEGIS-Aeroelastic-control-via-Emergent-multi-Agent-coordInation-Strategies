@@ -1,0 +1,324 @@
+%% Supplemental material for "Physics-Exact Credit Assignment for Multi-Agent
+%% Flutter Suppression" (submitted to the Journal of Guidance, Control, and
+%% Dynamics). Cited from the main text; not subject to the journal's page
+%% limit. Reproduces exactly the content of the corresponding main-text
+%% sections in the prior (longer) draft, unabridged, for reviewers and readers
+%% who want the full derivations and reproducibility detail.
+\documentclass[11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[letterpaper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{siunitx}
+\usepackage[hidelinks]{hyperref}
+\usepackage[round]{natbib}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
+
+\newcommand{\Uf}{U_{\mathrm{f}}}
+\input{numbers}
+
+\title{Supplemental Material: Physics-Exact Credit Assignment for\\
+Multi-Agent Flutter Suppression}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\noindent This document collects material referenced from the main text but
+moved here to meet the journal's page-length guidance. Section, table, and
+figure numbers below are internal to this document (prefixed S) and are
+cross-referenced from the main text by name, not by number. All numerical
+results here were computed by the same code and are covered by the same
+seed-count and statistical-correction standard stated where noted in the main
+text.
+
+\section*{S1. Training hyperparameters}
+\label{app:hyperparameters}
+
+Table~\ref{tab:params-ppo} lists the PPO and network hyperparameters shared
+across every learned variant in the credit and architecture ablations and
+the exploration-scale sweep, except where a hyperparameter is itself the
+subject of an ablation (the initial exploration standard deviation, and the
+presence or absence of the architectural mechanisms). All
+runs share parameters across agents, with the agent index supplied as a one-hot
+input, so the parameter count does not grow with the number of surfaces.
+
+\begin{table}[h]
+\centering
+\caption{PPO and network hyperparameters.}
+\label{tab:params-ppo}
+\begin{tabular}{@{}lp{5.6cm}@{}}
+\toprule
+Hyperparameter & Value \\
+\midrule
+Parallel environments & 128 \\
+Rollout length & 128 steps \\
+Epochs per update & 4 \\
+Minibatches per epoch & 4 \\
+BPTT segment length & 32 steps \\
+Learning rate (Adam) & $3\times 10^{-4}$ \\
+Discount $\gamma$ & 0.995 \\
+GAE $\lambda$ & 0.95 \\
+PPO clip range & 0.2 \\
+Value loss coefficient & 0.5 \\
+Entropy coefficient & $2\times 10^{-3}$ (0 in the exploration sweep) \\
+Max gradient norm & 0.5 \\
+Curriculum fraction & 0.4 of training \\
+Hidden layer width (trunk) & 128 \\
+Phasor encoder hidden width & 64 \\
+Retained modes per phasor & 2 \\
+Consensus rounds & 2 \\
+Action-head output-layer gain (init.) & 0.01 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section*{S2. Compute and reproducibility}
+\label{app:compute}
+
+Every learned variant in this paper trains for $1.5{\times}10^6$ environment
+steps across 128 vectorised environments (Table~\ref{tab:params-ppo}) on a
+single NVIDIA RTX 5000 Ada (laptop) GPU, using PyTorch 2.6. Across the 86
+training runs behind the main results and ablations, median wall-clock training
+time is \SI{331}{\second} (minimum \SI{246}{\second} for a plain policy,
+maximum \SI{1115}{\second} for the full \texttt{mocca} architecture, whose
+GRU encoder and consensus rounds are the most expensive forward pass in the
+ablation set), at a median throughput of
+$4.5{\times}10^3$ environment steps per second --- the batched environment
+rather than the network is the bottleneck at this
+scale, since the plant assembly is vectorised across
+environments but not across agents. The full set of runs reported in this paper --- the credit and architecture
+ablations, the eight-surface scaling probe, and every additional probe in
+Section~S3 below --- totals \SI{12.7}{\hour} of GPU time; no result in
+this paper required infrastructure beyond a single workstation GPU.
+
+\section*{S3. Additional probes}
+\label{sec:probes}
+
+The results in the main text are held to a fixed standard: six seeds,
+Welch's $t$-test, Cohen's $d$ and Hedges' $g$, Holm-Bonferroni corrected.
+Three further questions arose directly out of those results and were
+checked, but only at one or two seeds each --- not because the questions
+matter less, but because reaching the main standard for every question this
+study raised would have multiplied its cost several times over. We report
+them as probes rather than findings: Table~\ref{tab:probes} gives every seed
+individually rather than a mean, so that no reader mistakes a two-point
+spread for an estimated standard deviation.
+
+\begin{table}[h]
+\centering
+\caption{Additional probes, one or two seeds each, at $\sigma=0.05$. Every
+healthy-decay value is listed per seed, not averaged, because two points do not
+estimate a standard deviation. \texttt{-{}-} marks a probe not run for that
+variant.}
+\label{tab:probes}
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.6cm}l>{\raggedright\arraybackslash}p{3.4cm}c@{}}
+\toprule
+Probe & Variant & Healthy decay [1/s], per seed & Held \\
+\midrule
+\multicolumn{4}{@{}p{0.97\linewidth}@{}}{\emph{Do the negative mechanisms of the architecture ablation also hurt as a residual correction?}} \\
+residual + raw comm. & \texttt{residual\_comm} & $-0.697,\ -0.247$ & 6/9, 6/9 \\
+residual + health-channel consensus & \texttt{residual\_health} & $-0.518,\ -0.066$ & 5/9, 5/9 \\
+\addlinespace
+\multicolumn{4}{@{}p{0.97\linewidth}@{}}{\emph{Does supervising the encoder on the true modal phasor help?}} \\
+supervised encoder, plain head & \texttt{aux\_encoder} & $-0.219,\ -0.029$ & 5/9, 5/9 \\
+supervised encoder, residual & \texttt{aux\_residual} & $-0.431,\ -0.510$ & 5/9, 5/9 \\
+\addlinespace
+\multicolumn{4}{@{}p{0.97\linewidth}@{}}{\emph{Eight-surface scaling}} \\
+consensus, plain head, $N{=}8$ & \texttt{mocca\_nohead} & $-0.028,\ -0.015$ & 9/9, 8/9 \\
+recurrent only, $N{=}8$ & \texttt{recurrent\_only} & $+0.135,\ -0.011$ & 9/9, 9/9 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{The negative architecture result survives moving to a residual policy}
+The plain-policy architecture ablation found that consensus
+and raw neighbour sharing hurt. Applying the same two mechanisms to a policy
+that corrects a decentralised LQG base law instead of replacing it --- the
+setting where \texttt{residual\_only} is the strongest result in the paper at
+$-1.53\,\mathrm{s}^{-1}$ --- gives
+\texttt{residual\_comm} at $-0.697$ and $-0.247$ and \texttt{residual\_health}
+at $-0.518$ and $-0.066$: both clearly below \texttt{residual\_only}, at both
+seeds. The negative result is not an artefact of the specific plain-policy
+setting it was first measured in.
+
+\paragraph{Supervising the encoder on ground truth does not help}
+\texttt{aux\_encoder} adds a loss term supervising the phasor encoder directly
+on the true modal phasor --- privileged information, unavailable outside
+simulation --- rather than letting the encoder's representation be shaped
+purely by the RL objective. Both seeds ($-0.219$, $-0.029$) sit below the
+un-supervised \texttt{mocca\_nohead} result of $-0.308\pm0.169$, and the
+residual counterpart
+\texttt{aux\_residual} ($-0.431$, $-0.510$) sits far below
+\texttt{residual\_only}'s $-1.53$. We read this as mild evidence that the
+credit signal already supplies what the encoder needs to represent, and that
+an additional supervised loss competes with, rather than complements, the
+policy gradient here --- consistent with the broader pattern that mechanisms
+motivated by the physics did not survive contact with this specific plant
+and reward.
+
+\paragraph{Eight surfaces changes what ``held'' means, not just how many}
+The main text reports that all nine evaluation conditions become
+feasible for the learned policies at eight surfaces; Table~\ref{tab:probes}
+gives the numbers behind that sentence. They deserve a more careful reading
+than ``held'' alone provides: \texttt{mocca\_nohead} holds nine of nine and
+eight of nine conditions, but at a healthy-condition decay rate of only
+$-0.028$ and $-0.015$ --- an order of magnitude weaker than the three-surface
+result for the same architecture. \texttt{recurrent\_only} holds every
+condition at both seeds, yet one seed's healthy-condition decay is
+\emph{positive} ($+0.135$). ``Held'' in Table~\ref{tab:probes} means the
+episode did not cross the divergence threshold within its duration, not that
+the wing was driven to a decisively damped state; a bounded, barely-growing
+oscillation can hold a condition by this criterion without being a controller
+we would recommend. We stand by the qualitative claim that eight-surface
+architectures fail less catastrophically than three-surface ones, and retract
+any stronger reading of it than that.
+
+\section*{S4. Baseline controller synthesis}
+\label{app:baselines}
+
+This section gives the synthesis equations behind every rung of the
+classical baseline ladder in the main text, so that ``discrete-time LQG on
+local accelerometers'' is reproducible from this document alone rather than
+only from the repository.
+
+\subsection*{Augmented, discretised plant}
+
+Actuator lag is part of the design plant, not an unmodelled disturbance added
+afterwards: with $z=[q,\dot q, x_{\mathrm{w}}, \delta]$ (the state of the
+equation of motion augmented with the deflections) and first-order servo lag of
+time constant $\tau_k$ per surface,
+\begin{equation}
+\dot z = \tilde A z + \tilde B u, \qquad
+\tilde A = \begin{bmatrix} A & B \\ 0 & -\mathrm{diag}(\tau_k^{-1}) \end{bmatrix},
+\quad
+\tilde B = \begin{bmatrix} 0 \\ \mathrm{diag}(\tau_k^{-1}) \end{bmatrix},
+\label{eq:augplant}
+\end{equation}
+where $A,B$ are the plant matrices in state-space form and
+$u\in[-1,1]^K$ is the normalised command. Every controller in this study is
+synthesised in discrete time at the \SI{200}{\hertz} control rate via the exact
+zero-order-hold discretisation
+\begin{equation}
+\begin{bmatrix} \Phi & \Gamma \\ 0 & I \end{bmatrix}
+= \exp\!\left( \begin{bmatrix} \tilde A & \tilde B \\ 0 & 0 \end{bmatrix} \Delta t \right),
+\label{eq:zoh}
+\end{equation}
+giving $z_{t+1} = \Phi z_t + \Gamma u_t$. Designing in continuous time and
+integrating the resulting gain with a forward-Euler step at $\Delta t=\SI{5}{ms}$
+is not a minor approximation here: the wake states have $|\lambda|$ up to
+$\sim\!\SI{1.3e4}{\radian\per\second}$, so $\Delta t\,|\lambda|\approx 63$, and
+the observer built that way is unstable regardless of how good its gain is.
+
+\subsection*{LQR gain}
+
+The state cost weights physical structural energy rather than an arbitrary
+diagonal, plus a light penalty on held deflection so the optimum does not park
+surfaces at the travel limit:
+\begin{equation}
+Q = \begin{bmatrix} K_{\mathrm{modal}} & & \\ & M_{\mathrm{modal}} & \\ & & \mathrm{diag}\!\left(w_{\mathrm{rate}}/\delta_{\max,k}^2\right) \end{bmatrix},
+\qquad
+R = \mathrm{diag}\!\left(w_{\mathrm{effort}}/\delta_{\max,k}^2\right),
+\label{eq:lqrcost}
+\end{equation}
+with $w_{\mathrm{effort}}=2{\times}10^4$, $w_{\mathrm{rate}}=10^2$ throughout.
+The discrete-time algebraic Riccati equation
+\begin{equation}
+P = \Phi^{\!\top} P \Phi - \Phi^{\!\top} P \Gamma \left(R+\Gamma^{\!\top} P \Gamma\right)^{-1} \Gamma^{\!\top} P \Phi + Q
+\label{eq:dare}
+\end{equation}
+gives the gain $\mathcal{K}=(R+\Gamma^{\!\top} P \Gamma)^{-1}\Gamma^{\!\top} P \Phi$
+and command $u_t=-\mathcal{K} z_t$ \citep{anderson2007optimal}.
+\texttt{BatchedLQR} solves \eqref{eq:dare} once at a fixed design speed;
+\texttt{BatchedScheduledLQR} solves it on a \SI{9}{}-point airspeed grid over
+the evaluation envelope and linearly interpolates $\mathcal{K}$ between grid
+points; \texttt{BatchedJamAwareLQR} additionally zeros the failed surface's
+column of $\Gamma$ per failure hypothesis and resolves \eqref{eq:dare} for each
+hypothesis on the same grid, so the surviving surfaces' gains already account
+for the loss rather than compensating for it reactively.
+
+\subsection*{Local rate feedback}
+
+The floor of the ladder uses no plant model: with $\dot h_k,\dot\alpha_k$ the
+locally sensed plunge and twist rate at surface $k$'s own station,
+\begin{equation}
+u_k = -\left(g_h\,\dot h_k + g_\alpha\,\dot\alpha_k\right), \qquad g_h=0.35,\ g_\alpha=0.9,
+\label{eq:ratefeedback}
+\end{equation}
+clipped to $[-1,1]$.
+
+\subsection*{Steady-state Kalman observer on local accelerometers}
+
+The centralised and decentralised LQG rungs replace the true state $z_t$ in
+$u_t=-\mathcal{K}\hat z_t$ with an estimate driven only by the accelerometer
+channels the agents themselves observe, $y_t = H z_t$, where $H$ is built from
+the acceleration rows of the plant rather than a selection matrix, since an
+accelerometer measures $\ddot q$, an algebraic function of the state rather
+than a state itself. The steady-state predictor-form filter is
+\begin{align}
+\Sigma &= \Phi\Sigma\Phi^{\!\top} + W
+- \Phi\Sigma H^{\!\top}\!\left(H\Sigma H^{\!\top}+V\right)^{-1}\! H\Sigma\Phi^{\!\top},
+\label{eq:kalmanriccati} \\
+L &= \Phi\Sigma H^{\!\top}\!\left(H\Sigma H^{\!\top}+V\right)^{-1}, \\
+\hat z_{t+1} &= \Phi\hat z_t + \Gamma u_t + L\left(y_t - H\hat z_t\right),
+\label{eq:kalmanupdate}
+\end{align}
+with process noise $W=10^{-4}I$ and measurement noise
+$V=10^{-6}\,\mathrm{diag}(\lVert H_i\rVert^2)$ scaled per-channel, since
+accelerometer rows of $H$ have norms of order $10^4$--$10^5$ and an unscaled
+$V$ demands impossible measurement precision and drives $L$ to blow up
+\citep{anderson2007optimal}. \texttt{BatchedLQG} solves
+\eqref{eq:kalmanriccati}--\eqref{eq:kalmanupdate} once with $H$ built from all
+six channels and $\mathcal{K}$ commanding all three surfaces jointly, on the
+same speed grid as the scheduled LQR. \texttt{Batched\-Decentralized\-LQG}
+solves an \emph{independent} instance of
+\eqref{eq:kalmanriccati}--\eqref{eq:kalmanupdate} per surface $k$, with $H$
+restricted to $k$'s own two accelerometer rows and $\Gamma$ restricted to $k$'s
+own column, so agent $k$'s estimate, gain and command never depend on any
+other surface's measurement or actuation --- the discrete-time, model-based
+analogue of the information structure the learned policies are given. Its
+scheduling grid spans the same $[1.0,1.5]\,\Uf$ range as the training
+curriculum exactly, by construction rather than
+coincidence, so the comparison in the main text is not confounded
+by the classical design being scheduled over a narrower envelope than the
+learned policy was trained on.
+
+\subsection*{Re-tuning the decentralised LQG for control-authority margin}
+\label{app:robust}
+
+\texttt{BatchedRobustDecentralizedLQG} is
+structurally identical to \texttt{BatchedDecentralizedLQG}: same per-surface
+observer, same restriction to each agent's own two accelerometers and own
+actuator. Two remedies for its lack of a guaranteed margin
+\citep{doyle1978guaranteed} were checked. The first, loop transfer recovery
+\citep{doylestein1981ltr}, boosts the process-noise weighting $W$ in
+\eqref{eq:kalmanriccati} by $\rho\, b_k b_k^{\top}$ (agent $k$'s own reduced
+input column) as $\rho\to\infty$, pushing the filter loop toward the
+full-state loop shape. Sweeping $\rho$ from $0$ to $10^4$ changes the
+control-authority margin (the largest reduction in true control authority,
+relative to the design assumption, the closed loop remains stable under, found
+by bisection on the discrete-time closed-loop spectral radius) not at all: it
+stays at $0.158$ at $1.45\,\Uf$ throughout. Comparing against the same gain
+applied with perfect (observer-free) state feedback, whose margin is also
+$0.158$, shows why: the observer is not the bottleneck, so there is nothing
+for an observer-side remedy to recover.
+
+The second remedy, and the one \texttt{BatchedRobustDecentralizedLQG} actually
+uses, re-weights the LQR cost \eqref{eq:lqrcost} itself: $w_{\mathrm{effort}}$
+increased from $2\times10^4$ to $10^6$, with $w_{\mathrm{rate}}$, $W$ and $V$
+unchanged. This raises the control-authority margin from $0.158$ to $0.179$
+before plateauing (no further gain to $w_{\mathrm{effort}}=10^{7}$), at a cost
+to nominal decay rate documented in the main text.
+\texttt{scripts/robust\_baseline\_check.py} reproduces both checks.
+
+\bibliographystyle{plainnat}
+\bibliography{refs,refs_extra}
+\end{document}
+

@@ -3,12 +3,15 @@
 % been verified -- a fabricated reference is the fastest route to a desk reject.
 
 % ---------------------------------------------------------------- aeroelasticity
-@techreport{goland1945,
-  author      = {Goland, Martin},
-  title       = {The Flutter of a Uniform Cantilever Wing},
-  institution = {Journal of Applied Mechanics},
-  year        = {1945},
-  note        = {Vol. 12, No. 4, pp. A197--A208}
+@article{goland1945,
+  author  = {Goland, Martin},
+  title   = {The Flutter of a Uniform Cantilever Wing},
+  journal = {Journal of Applied Mechanics},
+  volume  = {12},
+  number  = {4},
+  pages   = {A197--A208},
+  year    = {1945},
+  doi     = {10.1115/1.4009489}
 }
 
 @techreport{theodorsen1935,
@@ -16,7 +19,8 @@
   title       = {General Theory of Aerodynamic Instability and the Mechanism of Flutter},
   institution = {National Advisory Committee for Aeronautics},
   number      = {NACA TR-496},
-  year        = {1935}
+  year        = {1935},
+  url         = {https://ntrs.nasa.gov/citations/19800006788}
 }
 
 @techreport{jones1940,
@@ -24,7 +28,8 @@
   title       = {The Unsteady Lift of a Wing of Finite Aspect Ratio},
   institution = {National Advisory Committee for Aeronautics},
   number      = {NACA TR-681},
-  year        = {1940}
+  year        = {1940},
+  url         = {https://ntrs.nasa.gov/citations/19930091758}
 }
 
 @book{fung1955,
@@ -50,36 +55,58 @@
   volume  = {4},
   number  = {44},
   pages   = {1885},
-  year    = {2019}
+  year    = {2019},
+  doi     = {10.21105/joss.01885}
 }
 
 % ------------------------------------------------- learning for flutter control
 @article{stallflutter2025,
-  author  = {Physics of Fluids},
+  author  = {Li, Jinying and Dai, Yuting and Hu, Yating and Zhang, Yuming and
+             Yang, Chao},
   title   = {Deep reinforcement learning control for stall flutter via active
              camber morphing},
   journal = {Physics of Fluids},
   volume  = {37},
   number  = {10},
   pages   = {105166},
-  year    = {2025}
+  year    = {2025},
+  doi     = {10.1063/5.0295770}
 }
 
 @article{circulation2023,
+  author  = {Chen, Zhen and Shi, Zhiwei and Chen, Sinuo and Tong, Shengxiang and
+             Dong, Yizhang},
   title   = {Active flutter suppression for a flexible wing model with
              trailing-edge circulation control via reinforcement learning},
   journal = {AIP Advances},
   volume  = {13},
   number  = {1},
   pages   = {015317},
-  year    = {2023}
+  year    = {2023},
+  doi     = {10.1063/5.0130370}
 }
 
 @article{flyingwing2022,
+  author  = {Mu, Xusheng and Huang, Rui and Zou, Qitong and Hu, Haiyan},
   title   = {Machine learning-based active flutter suppression for a flexible
              flying-wing aircraft},
   journal = {Journal of Sound and Vibration},
-  year    = {2022}
+  volume  = {529},
+  pages   = {116916},
+  year    = {2022},
+  doi     = {10.1016/j.jsv.2022.116916}
+}
+
+@article{shapley2026stallflutter,
+  author  = {Li, Jinying and Dai, Yuting and Huang, Guangjing and Xia, Yingjie
+             and Yang, Chao},
+  title   = {{Shapley}-Additive-Explanation-Based Stall Flutter Control: from
+             Neural Interpretation to Explainable Policy Design},
+  journal = {AIAA Journal},
+  pages   = {1--18},
+  year    = {2026},
+  doi     = {10.2514/1.J066411},
+  note    = {Published online 16 July 2026}
 }
 
 % ------------------------------------------------------ reinforcement learning
@@ -88,7 +115,8 @@
              Radford, Alec and Klimov, Oleg},
   title   = {Proximal Policy Optimization Algorithms},
   journal = {arXiv preprint arXiv:1707.06347},
-  year    = {2017}
+  year    = {2017},
+  doi     = {10.48550/arXiv.1707.06347}
 }
 
 @inproceedings{ng1999shaping,
@@ -107,7 +135,8 @@
   volume  = {4},
   number  = {2/3},
   pages   = {265--279},
-  year    = {2001}
+  year    = {2001},
+  doi     = {10.1142/S0219525901000188}
 }
 
 @inproceedings{foerster2018coma,
@@ -115,7 +144,10 @@
                and Nardelli, Nantas and Whiteson, Shimon},
   title     = {Counterfactual Multi-Agent Policy Gradients},
   booktitle = {AAAI Conference on Artificial Intelligence},
-  year      = {2018}
+  volume    = {32},
+  number    = {1},
+  year      = {2018},
+  doi       = {10.1609/aaai.v32i1.11794}
 }
 
 @inproceedings{rashid2018qmix,
@@ -124,14 +156,19 @@
   title     = {{QMIX}: Monotonic Value Function Factorisation for Deep
                Multi-Agent Reinforcement Learning},
   booktitle = {International Conference on Machine Learning},
-  year      = {2018}
+  year      = {2018},
+  doi       = {10.48550/arXiv.1803.11485}
 }
 
 @inproceedings{sunehag2018vdn,
-  author    = {Sunehag, Peter and Lever, Guy and Gruslys, Audrunas and others},
+  author    = {Sunehag, Peter and Lever, Guy and Gruslys, Audrunas and
+               Czarnecki, Wojciech M. and Zambaldi, Vinicius and Jaderberg, Max
+               and Lanctot, Marc and Sonnerat, Nicolas and Leibo, Joel Z. and
+               Tuyls, Karl and Graepel, Thore},
   title     = {Value-Decomposition Networks for Cooperative Multi-Agent Learning},
   booktitle = {International Conference on Autonomous Agents and MultiAgent Systems},
-  year      = {2018}
+  year      = {2018},
+  doi       = {10.48550/arXiv.1706.05296}
 }
 
 @inproceedings{lowe2017maddpg,
@@ -140,7 +177,8 @@
   title     = {Multi-Agent Actor-Critic for Mixed Cooperative-Competitive
                Environments},
   booktitle = {Advances in Neural Information Processing Systems},
-  year      = {2017}
+  year      = {2017},
+  doi       = {10.48550/arXiv.1706.02275}
 }
 
 @inproceedings{yu2022mappo,
@@ -149,29 +187,39 @@
   title     = {The Surprising Effectiveness of {PPO} in Cooperative Multi-Agent
                Games},
   booktitle = {Advances in Neural Information Processing Systems},
-  year      = {2022}
+  year      = {2022},
+  doi       = {10.48550/arXiv.2103.01955}
 }
 
-@article{albrecht2023survey,
-  author  = {Albrecht, Stefano V. and Christianos, Filippos and Sch{\"a}fer, Lukas},
-  title   = {Multi-Agent Reinforcement Learning: Foundations and Modern Approaches},
-  journal = {arXiv preprint arXiv:2312.10256},
-  year    = {2023}
+@book{albrecht2023survey,
+  author    = {Albrecht, Stefano V. and Christianos, Filippos and Sch{\"a}fer, Lukas},
+  title     = {Multi-Agent Reinforcement Learning: Foundations and Modern Approaches},
+  publisher = {MIT Press},
+  year      = {2024},
+  isbn      = {9780262049375},
+  note      = {Also freely available at \url{https://www.marl-book.com}}
 }
 
 @article{scalingmarl2025,
+  author  = {Geng, Minghong and Pateria, Shubham and Subagdja, Budhitama and
+             Tan, Ah-Hwee},
   title   = {Scaling Up Multi-Agent Reinforcement Learning for Large Agent Teams
              and Long-Horizon Tasks: A Survey},
   journal = {ACM Computing Surveys},
-  year    = {2025},
+  volume  = {58},
+  number  = {14},
+  pages   = {1--37},
+  year    = {2026},
   doi     = {10.1145/3817113}
 }
 
 @article{multilevelcredit2025,
+  author  = {Zhao, Xutong and Xie, Yaqi},
   title   = {Multi-level Advantage Credit Assignment for Cooperative Multi-Agent
              Reinforcement Learning},
   journal = {arXiv preprint arXiv:2508.06836},
-  year    = {2025}
+  year    = {2025},
+  doi     = {10.48550/arXiv.2508.06836}
 }
 
 % ----------------------------------------------------------- learned communication
@@ -179,7 +227,8 @@
   author    = {Sukhbaatar, Sainbayar and Szlam, Arthur and Fergus, Rob},
   title     = {Learning Multiagent Communication with Backpropagation},
   booktitle = {Advances in Neural Information Processing Systems},
-  year      = {2016}
+  year      = {2016},
+  doi       = {10.48550/arXiv.1605.07736}
 }
 
 @inproceedings{das2019tarmac,
@@ -187,5 +236,6 @@
                Batra, Dhruv and Parikh, Devi and Rabbat, Michael and Pineau, Joelle},
   title     = {{TarMAC}: Targeted Multi-Agent Communication},
   booktitle = {International Conference on Machine Learning},
-  year      = {2019}
+  year      = {2019},
+  doi       = {10.48550/arXiv.1810.11187}
 }

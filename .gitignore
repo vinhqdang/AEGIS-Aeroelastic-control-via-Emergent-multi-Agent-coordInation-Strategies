@@ -228,6 +228,10 @@ paper/*.log
 paper/*.bbl
 paper/*.blg
 paper/*.out
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.spl
+paper/*.bbl-SAVE-ERROR
 sharpy/uvlm_cases*/
 sharpy/flap_cases*/
 sharpy/cases/

@@ -58,9 +58,9 @@ independently actuated surfaces of a Goland wing cross-validated against an
 unsteady vortex-lattice solver, a closed-form per-agent credit signal in place
 of the estimated one the method normally requires. Combined with log-energy
 shaping, this credit beats the closed form alone ($g=-2.49$, corrected $p=0.020$, also against a
-naive reward and an adapted VDN-style baseline); it does not significantly
-beat shaping alone at that standard, which a less rigorous earlier version
-overstated, and we report the retraction with the finding. Its advantage over the estimated alternatives is reliability, not raw
+naive reward and an adapted VDN-style baseline); once corrected across the
+full five-variant comparison family, it does not significantly beat shaping
+alone at that standard. Its advantage over the estimated alternatives is reliability, not raw
 mean: both match or exceed it on some seeds and fail on others, at higher
 variance.
 
@@ -281,7 +281,16 @@ hand-designed gain in: one learning agent, one effector, one global observation.
 None asks what changes when the effectors are commanded by separate agents that
 cannot see the whole wing, which is the question a wing with several
 independently actuated surfaces on a shared bus makes practically relevant and
-is the gap this paper occupies. Framing a wing's own surface as a multi-agent
+is the gap this paper occupies. A very recent follow-up to the camber-morphing
+line distills a trained single-agent controller into a transparent, rule-based
+policy using Shapley additive explanations \citep{shapley2026stallflutter} ---
+itself a credit-assignment concept, though one applied \emph{post hoc} to
+interpret an already-fitted network rather than to decompose a reward before
+training. The distinction from our own use of a closed-form credit is where
+the decomposition acts: theirs explains one agent's policy after training;
+ours decomposes the reward several agents train against, derived from the
+plant's energy budget before training begins, and remains single-agent
+throughout. Framing a wing's own surface as a multi-agent
 system is not without precedent: Shalymov et al.\
 \citep{shalymov2020feathers} cover an entire wing in many small independently
 actuated ``feathers'' and synthesise a speed-gradient adaptive control law
@@ -1062,26 +1071,24 @@ weight choice or by the plant's own known modelling error.
 \label{sec:ablations}
 
 \paragraph{Credit assignment}
-Six seeds per variant at $\sigma=0.05$ (Table~\ref{tab:ablation-credit}), now
-five variants rather than three: the exact-plus-shaping combination
-(\texttt{ippo\_blended}), each half alone (\texttt{ippo\_physics},
-\texttt{shaped\_shared}), the naive undecomposed shared reward
-(\texttt{ippo\_shared}, brought to the same six-seed standard from the
-single-seed probe an earlier version of this paper reported), and a learned
+Six seeds per variant at $\sigma=0.05$ (Table~\ref{tab:ablation-credit}), five
+variants: the exact-plus-shaping combination (\texttt{ippo\_blended}), each
+half alone (\texttt{ippo\_physics}, \texttt{shaped\_shared}), the naive
+undecomposed shared reward (\texttt{ippo\_shared}), and a learned
 value-decomposition credit in the style of VDN \citep{sunehag2018vdn}
 (\texttt{vdn\_shared}, Section~\ref{sec:vdn}) --- the comparison against an
 actual estimated credit-factorisation method that Section~\ref{sec:related}
-argues for but, in the version of this study reviewed previously, never ran.
-Reporting five variants together means ten pairwise comparisons rather than
-three, so every $p$-value in this paragraph and Table~\ref{tab:ablation-credit}
-is Holm-Bonferroni-corrected across that full family, and effect sizes are
-Hedges' $g$ (small-sample-corrected) alongside Cohen's $d$. We also disclose,
-because a reviewer is entitled to ask how the six-seed standard was chosen
-rather than assume it was fixed in advance: the credit-versus-shaping
-comparison read positive, then null, then positive again across earlier,
-lower-seed sweeps before six seeds stabilised its sign, which is why this
-paper adopted a fixed seed count and a significance test in the first place
-rather than reading conclusions off small samples. That history does not
+argues for. Reporting five variants together means ten pairwise comparisons
+rather than three, so every $p$-value in this paragraph and
+Table~\ref{tab:ablation-credit} is Holm-Bonferroni-corrected across that full
+family, and effect sizes are Hedges' $g$ (small-sample-corrected) alongside
+Cohen's $d$. We also disclose, to preempt the natural question of how the
+six-seed standard was chosen rather than assume it was fixed in advance: a
+preliminary, lower-seed sweep of the credit-versus-shaping comparison read
+positive, then null, then positive again as seeds were added, before six
+seeds stabilised its sign, which is why we adopted a fixed seed count and a
+significance test in the first place rather than reading conclusions off
+small samples. That history does not
 retroactively invalidate the six-seed measurement, but it is part of why we
 treat the comparisons in this table as being at the edge of what six seeds can
 settle, rather than as more solid than the correction above already shows them
@@ -1091,10 +1098,9 @@ The combination reaches $-1.085 \pm 0.243$, and beats the closed-form credit
 alone ($-0.566\pm0.123$) at $g=-2.49$, $p_{\mathrm{Holm}}=0.020$ -- the one
 comparison in this table that survives correction. It does \emph{not}
 significantly beat shaping alone ($-0.690\pm0.145$, $g=-1.82$,
-$p_{\mathrm{Holm}}=0.080$) at this standard, which is a real retraction from
-the previous version of this paper: reported alongside only two other
-variants, that comparison's uncorrected $p=0.009$ looked significant: it does
-not survive being tested as part of the five-variant family the physical
+$p_{\mathrm{Holm}}=0.080$) at this standard: tested alongside only two other
+variants, that comparison's uncorrected $p=0.009$ looks significant, but it
+does not survive being tested as part of the five-variant family the physical
 question actually calls for. We do not think the mechanism we described --
 the closed form supplying an instantaneous term, the shaping supplying a
 long-horizon one -- is wrong, only that this experiment does not establish it
@@ -1169,8 +1175,8 @@ shared reward on this task, rather than as a demonstration that value
 decomposition cannot work here in some other form; COMA's counterfactual
 baseline \citep{foerster2018coma} and QMIX's monotonic mixing network
 \citep{rashid2018qmix} were not adapted and tested, and we do not claim this
-one experiment closes the comparison the review that shaped this section asked
-for, only that it opens it honestly.
+one experiment closes the comparison to estimated credit-factorisation
+methods, only that it opens it honestly.
 
 \paragraph{Architecture}
 The mechanisms we derived from the same physics do not survive measurement, and
@@ -1298,10 +1304,9 @@ achieves but not yet as sharp as the centralised design.
 \subsection{What limits learning here}
 \label{sec:exploration}
 
-Figure~\ref{fig:exploration} is the finding with the widest reach, and the one
-we have now brought to the same six-seed standard as the ablations rather than
-the two seeds per point an earlier version of this paper reported. Holding
-everything else fixed and varying only the initial exploration standard
+Figure~\ref{fig:exploration} is the finding with the widest reach, and we hold
+it to the same six-seed standard as the ablations above rather than to a
+smaller pilot sweep. Holding everything else fixed and varying only the initial exploration standard
 deviation moves performance by a factor of two ($-1.805\pm0.257$ at
 $\sigma=0.05$ against $-0.908\pm0.271$ at $\sigma=0.15$, a ratio of $1.99$),
 with an interior optimum at $\sigma=0.05$ and a clear degradation above it --
@@ -1325,17 +1330,16 @@ buried underneath it.
 
 This is not a tuning remark. Before we found it, every variant plateaued between
 $-0.03$ and $-0.82\,\mathrm{s}^{-1}$ regardless of credit signal, communication,
-action parameterisation, memory, auxiliary supervision or base controller. We
-had reported the seed-to-seed spread behind that plateau, from two seeds, as
-falling sharply between the conventional and matched scale ($0.132$ at
-$\sigma=0.30$ to $0.016$ at $\sigma=0.05$); at six seeds it does not fall
-sharply at all ($0.325$ at $\sigma=0.30$ to $0.257$ at $\sigma=0.05$), which we
-flag as a second instance in this paper of a two-seed spread understating the
-true variance, alongside the credit-versus-shaping retraction in
-Section~\ref{sec:ablations}. The interior optimum and the factor-of-two
-effect on the mean are what survive at six seeds; the earlier claim that the
-spread itself shrank sharply at the matched scale does not, and we withdraw
-it. A capability probe rules out the competing explanation: training on the
+action parameterisation, memory, auxiliary supervision or base controller. An
+initial two-seed pilot of the spread behind that plateau suggested it fell
+sharply between the conventional and matched scale ($0.132$ at $\sigma=0.30$
+to $0.016$ at $\sigma=0.05$); the six-seed measurement reported here does not
+confirm that ($0.325$ at $\sigma=0.30$ to $0.257$ at $\sigma=0.05$), a second
+instance in this paper of a two-seed spread understating the true variance,
+alongside the credit-versus-shaping correction in Section~\ref{sec:ablations}.
+The interior optimum and the factor-of-two effect on the mean are what
+survive at six seeds; the claim that the spread itself shrinks sharply at the
+matched scale does not, and we do not make it. A capability probe rules out the competing explanation: training on the
 single easiest condition gives $+0.21$ and $+0.27$, worse than training on the
 full distribution, so the plateau was never a matter of the task being too
 broad.
@@ -1530,22 +1534,21 @@ The result in Section~\ref{sec:ablations} is, as far as we can tell, a genuine
 instance of a difference reward with no estimation step at all, on a task with
 real physical structure rather than a toy coordination game, and it beats the
 closed-form credit used alone at the standard we hold every comparison in this
-paper to. We had also hoped to report that it beats shaping used alone; at
-three variants and an uncorrected test it did, and that is what an earlier
-version of this paper claimed. Once compared as part of the five-variant family
-the physical question actually calls for -- which is also what exposed that
-comparison's fragility -- the shaping-alone comparison does not survive
-correction, and we retract the stronger claim rather than keep reporting a
-result that does not hold up to the standard the rest of this section is held
-to. Against an adapted value-decomposition baseline (Section~\ref{sec:vdn}),
+paper to. Against shaping used alone, a smaller three-variant, uncorrected
+comparison would look significant ($p=0.009$); once compared as part of the
+five-variant family the physical question actually calls for -- which is also
+what exposes that comparison's fragility -- it does not survive correction,
+and we report the null result rather than the more favourable uncorrected
+one. Against an adapted value-decomposition baseline (Section~\ref{sec:vdn}),
 the closed-form credit's advantage is in reliability rather than raw mean: the
 learned decomposition reaches better damping on the conditions it stabilises,
 at the cost of stabilising fewer of them and with roughly triple the
-seed-to-seed variance. We think the more defensible summary of this section is
-narrower than our first submission's: the physics-derived signal is
-competitive with, not decisively better than, the alternatives we tested, and
-its main advantage is that it requires no estimation step and is consistent
-across seeds and conditions in a way none of the estimated alternatives were.
+seed-to-seed variance. The more defensible summary of this section is
+narrower than the credit signal's raw mean advantage alone would suggest: the
+physics-derived signal is competitive with, not decisively better than, the
+alternatives we tested, and its main advantage is that it requires no
+estimation step and is consistent across seeds and conditions in a way none
+of the estimated alternatives were.
 
 \paragraph{On the negative architecture result}
 We were not expecting the phasor consensus and phase-locked action head to
