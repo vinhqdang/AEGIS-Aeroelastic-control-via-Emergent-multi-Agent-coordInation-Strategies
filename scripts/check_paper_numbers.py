@@ -13,7 +13,7 @@ causes the problem.
 
 Usage::
 
-    python scripts/check_paper_numbers.py --tex paper/cep.tex
+    python scripts/check_paper_numbers.py --tex paper/jgcd.tex
 """
 
 from __future__ import annotations
@@ -119,7 +119,7 @@ def main() -> None:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--tex", default="paper/cep.tex")
+    parser.add_argument("--tex", default="paper/jgcd.tex")
     parser.add_argument("--credit-runs", default="runs/credit_fine")
     parser.add_argument("--arch-runs", default="runs/arch_fine")
     return parser.parse_args()
