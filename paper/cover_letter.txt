@@ -4,7 +4,16 @@ Dear Editor-in-Chief,
 
 We are pleased to submit our manuscript, "Physics-Exact Credit Assignment
 for Multi-Agent Flutter Suppression," for consideration as a Regular
-Article in the Journal of Guidance, Control, and Dynamics.
+Article in AIAA Journal.
+
+This manuscript was previously submitted to the Journal of Guidance,
+Control, and Dynamics, whose Editor-in-Chief withdrew it as outside that
+journal's scope (a distributed-control contribution validated on an
+aeroelastic testbed, rather than a guidance, navigation, or flight-control
+result in the narrower sense JGCD covers). We believe AIAA Journal, whose
+scope spans aerospace structures, dynamics, and control without that
+restriction, is the right venue for a paper that sits deliberately across
+those areas.
 
 The paper studies active flutter suppression on a wing with several
 independently actuated trailing-edge surfaces, each commanded by its own
@@ -31,20 +40,23 @@ refinement did not survive correction for multiple comparisons once
 compared against the full family of alternatives) at the same statistical
 standard as the positive ones.
 
-We believe this manuscript is a strong fit for the Journal of Guidance,
-Control, and Dynamics: it is fundamentally a distributed-control and
-credit-assignment contribution, using flutter suppression as a physically
-grounded, validated testbed rather than as an aerodynamics or
-fluid-structure-interaction result in its own right, and it engages
-directly with the certification gap between a learned policy and a
-classical design with a known stability margin, which we discuss explicitly
-in the paper.
+We believe this manuscript is a strong fit for AIAA Journal: it derives a
+result from the structural-dynamics equations of motion of an aeroelastic
+plant (a Goland wing), validates it against an unsteady vortex-lattice
+solver and a classical decentralised control baseline, and uses that
+physically grounded testbed to answer a distributed-control and
+credit-assignment question that a single-discipline aerodynamics,
+structures, or guidance-and-control journal is not positioned to referee
+on its own. It also engages directly with the certification gap between a
+learned policy and a classical design with a known stability margin, which
+we discuss explicitly in the paper.
 
-This manuscript, in whole or in substantial part, has not previously been
-submitted to any AIAA journal or conference. I will provide any further
-disclosure ScholarOne requests. I declare no conflicts of interest, and no
-funding was received for this work. Data and code needed to reproduce every
-result are cited in the manuscript's Data and Code Availability section.
+Other than the JGCD submission disclosed above, this manuscript, in whole
+or in substantial part, has not previously been submitted to any AIAA
+journal or conference. I will provide any further disclosure ScholarOne
+requests. I declare no conflicts of interest, and no funding was received
+for this work. Data and code needed to reproduce every result are cited in
+the manuscript's Data and Code Availability section.
 
 Thank you for your consideration. I look forward to your response.
 
