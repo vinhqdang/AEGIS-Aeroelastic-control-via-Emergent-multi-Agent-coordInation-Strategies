@@ -19,6 +19,8 @@
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{siunitx}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 
 \newtheorem{proposition}{Proposition}
 \newtheorem{remark}{Remark}
@@ -416,19 +418,73 @@ We use shared-parameter multi-agent PPO
 \cite{schulman2017ppo,yu2022mappo} with generalised advantage estimation
 \cite{schulman2016gae} and per-agent advantages, on-policy because the
 plant is cheap to simulate and the per-agent credit is recomputed exactly
-at every step rather than replayed. Updates run on sequences of consecutive
-steps with a detached stored hidden state; sampling shuffled individual
-timesteps, as we did initially, gives a recurrent encoder no temporal
-gradient at all \cite{hausknecht2015drqn} -- one illustrative run under the
-old sampler reached $-0.213\,\mathrm{s}^{-1}$ against $-0.566\pm0.123$ for
-the same variant under the sequence-based sampler used everywhere else.
-Full training pseudocode, hyperparameters, and network architecture
-(the trunk, an optional recurrent phasor encoder, optional spanwise-line
-consensus, and an optional phase-locked action head -- the mechanisms
-ablated in Section~\ref{sec:ablations} under the names \texttt{recurrent\_only},
+at every step rather than replayed. Writing $\pi_\theta$ for the shared
+policy and $V_\phi$ for its value head, agent $k$'s advantage is estimated
+from its own reward stream $r_k$ by
+\begin{equation}
+\hat A_k^t = \sum_{l=0}^{T-t-1} (\gamma\lambda)^l\, \delta_k^{t+l},
+\qquad
+\delta_k^t = r_k^t + \gamma V_\phi(s^{t+1}) - V_\phi(s^t),
+\label{eq:gae}
+\end{equation}
+sharing the centralised value baseline $V_\phi$ across agents while keeping
+the advantage itself, and hence the credit each agent trains on, per-agent
+and exact -- the estimated part of standard multi-agent PPO is variance
+reduction, not the credit assignment Proposition~\ref{prop:diff} already
+resolved in closed form. Parameters update on the clipped surrogate
+\begin{equation}
+\mathcal{L}(\theta) = \mathbb{E}_{k,t}\Big[
+\min\big(\rho_k^t(\theta)\, \hat A_k^t,\;
+\operatorname{clip}(\rho_k^t(\theta), 1{-}\epsilon, 1{+}\epsilon)\, \hat A_k^t\big)
+\Big],
+\qquad
+\rho_k^t(\theta) = \frac{\pi_\theta(a_k^t \mid o_k^t)}{\pi_{\theta_{\mathrm{old}}}(a_k^t \mid o_k^t)},
+\label{eq:ppo}
+\end{equation}
+summed with the usual value-function and entropy terms. Updates run on
+sequences of consecutive steps with a detached stored hidden state; sampling
+shuffled individual timesteps, as we did initially, gives a recurrent
+encoder no temporal gradient at all \cite{hausknecht2015drqn} -- one
+illustrative run under the old sampler reached $-0.213\,\mathrm{s}^{-1}$
+against $-0.566\pm0.123$ for the same variant under the sequence-based
+sampler used everywhere else. Algorithm~\ref{alg:mocca} summarises one
+full update; hyperparameters and network architecture (the trunk, an
+optional recurrent phasor encoder, optional spanwise-line consensus, and
+an optional phase-locked action head -- the mechanisms ablated in
+Section~\ref{sec:ablations} under the names \texttt{recurrent\_only},
 \texttt{mocca\_nohead}/\texttt{mocca}, and \texttt{comm\_raw}) are given in
 the Supplemental Material (Section S1) to stay within the journal's
-length guidance. Every head's final layer is scaled by $0.01$ at
+length guidance.
+
+\begin{algorithm}[t]
+\caption{Training with the blended (exact-plus-shaping) credit}
+\label{alg:mocca}
+\begin{algorithmic}[1]
+\State Assemble $M,C,K,L,B$ at the sampled airspeed; small-gain init of the
+action head
+\For{each update}
+  \State Ease the task distribution by the curriculum fraction
+  \For{$t=1,\dots,T$}
+    \State Each agent $k$ acts on its own $o_k^t$; step the coupled plant and
+    actuators
+    \State $P_k^t \gets (\dot q^\top b_k)\,\delta_k^t$
+    \Comment{closed form, Proposition~\ref{prop:diff}}
+    \State $r_k^t \gets -P_k^t/(E^t+\varepsilon)
+      + w\,[\Phi^{t+1}-\Phi^{t}]/\Delta t$
+    \Comment{$\Phi=-\log\frac{E+\varepsilon}{E_{\mathrm{ref}}}$}
+  \EndFor
+  \State Compute per-agent GAE advantages \eqref{eq:gae}
+  \For{each epoch, each minibatch of \emph{sequences}}
+    \State Unroll $L_{\mathrm{bptt}}$ steps from a detached hidden state; zero it
+    where an episode ended
+    \State Update on the clipped objective \eqref{eq:ppo} plus value loss
+    minus entropy bonus
+  \EndFor
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+Every head's final layer is scaled by $0.01$ at
 initialisation so a fresh policy is close to a no-op, which is what makes
 the residual variants of Section~\ref{sec:results} well-posed from the
 first update. Actions are Gaussian with a learned, state-independent

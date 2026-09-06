@@ -138,7 +138,10 @@ def plot_phase_profiles(profiles: list[PhaseProfile], path) -> None:
     from aegis.viz.paper import INK_MUTED, controller_color, use_paper_style
 
     use_paper_style()
-    figure, (top, bottom) = plt.subplots(2, 1, figsize=(5.6, 4.6), sharex=True)
+    # Tall enough to reserve a legend row below both panels: with five long,
+    # stat-bearing labels and only three points per line, "best" placement has
+    # nowhere clean inside the axes and lands the legend on top of the curves.
+    figure, (top, bottom) = plt.subplots(2, 1, figsize=(5.6, 5.7), sharex=True)
     for index, profile in enumerate(profiles):
         color = controller_color(index)
         top.plot(
@@ -156,9 +159,15 @@ def plot_phase_profiles(profiles: list[PhaseProfile], path) -> None:
     top.set_title(
         "Spanwise actuation phase at the dominant response frequency", loc="left"
     )
-    top.legend(loc="best", fontsize=7)
     bottom.set_ylabel("gain  [rad per unit modal rate]")
     bottom.set_xlabel("spanwise station  [fraction of semispan]")
     bottom.set_title("Actuation gain", loc="left")
+
+    handles, labels = top.get_legend_handles_labels()
+    figure.subplots_adjust(bottom=0.30, hspace=0.35)
+    figure.legend(
+        handles, labels, loc="lower center", bbox_to_anchor=(0.52, 0.0),
+        fontsize=6.6, ncol=1, frameon=False,
+    )
     figure.savefig(path)
     plt.close(figure)

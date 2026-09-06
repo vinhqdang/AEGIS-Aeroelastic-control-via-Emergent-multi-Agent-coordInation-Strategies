@@ -47,8 +47,8 @@ def main() -> None:
     # that a naive equal height allocation produces under an equal-aspect axis.
     figure = plt.figure(figsize=(8.6, 4.6))
     grid = figure.add_gridspec(
-        2, 2, height_ratios=[0.62, 1.0], width_ratios=[1.05, 1.0],
-        hspace=0.62, wspace=0.32, left=0.06, right=0.98, top=0.90, bottom=0.07,
+        2, 2, height_ratios=[0.80, 1.0], width_ratios=[1.05, 1.0],
+        hspace=0.55, wspace=0.32, left=0.06, right=0.98, top=0.93, bottom=0.07,
     )
     planform = figure.add_subplot(grid[0, :])
     section = figure.add_subplot(grid[1, 0])
@@ -103,24 +103,30 @@ def _draw_planform(axes, wing, colour_of, ink, ink_muted) -> None:
                color=ink_muted, lw=0.9)
     axes.plot([-semispan, semispan], [wing.cg_frac * chord] * 2, ":",
                color=ink_muted, lw=0.9)
+    # EA and CG sit only 0.10c apart -- far closer than the two labels' own
+    # text height at this scale -- so each is anchored to extend AWAY from the
+    # other (EA downward, CG upward) rather than centred on its line, or they
+    # render as one illegible overlapping blob.
     axes.text(semispan * 1.03, wing.ea_frac * chord, "EA", fontsize=7.2,
-               color=ink_muted, va="center")
+               color=ink_muted, va="top")
     axes.text(semispan * 1.03, wing.cg_frac * chord, "CG", fontsize=7.2,
-               color=ink_muted, va="center")
+               color=ink_muted, va="bottom")
     # Callout routed upward, into the empty space above the wing: below and to
     # the right are both already crowded with surface labels and the EA/CG key.
+    # It needs real headroom above the wing box (top edge at y=chord) for two
+    # lines of text without colliding with the panel title above the axes.
     middle = wing.surfaces[len(wing.surfaces) // 2]
     axes.annotate(
         "sensor station\n(accel. pair, fwd/aft of EA)",
         xy=(0.5 * (middle.y_start_frac + middle.y_end_frac) * semispan, 0.35 * chord),
-        xytext=(semispan * 0.30, 0.95 * chord),
+        xytext=(semispan * 0.30, 1.18 * chord),
         fontsize=6.6, color=ink_muted, ha="center", va="bottom",
         arrowprops=dict(arrowstyle="->", color=ink_muted, lw=0.6,
                          connectionstyle="arc3,rad=-0.3"),
     )
 
     axes.set_xlim(-semispan * 1.16, semispan * 1.16)
-    axes.set_ylim(-0.95 * chord, 1.30 * chord)
+    axes.set_ylim(-0.95 * chord, 1.75 * chord)
     axes.set_aspect("equal")
     axes.axis("off")
     axes.set_title(
