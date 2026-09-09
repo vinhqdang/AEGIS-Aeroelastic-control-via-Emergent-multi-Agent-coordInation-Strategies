@@ -1,19 +1,25 @@
-September 6, 2026
+September 9, 2026
 
 Dear Editor-in-Chief,
 
 We are pleased to submit our manuscript, "Physics-Exact Credit Assignment
-for Multi-Agent Flutter Suppression," for consideration as a Regular
-Article in AIAA Journal.
+for Multi-Agent Flutter Suppression," for consideration as a Research
+Article in the Journal of Sound and Vibration.
 
-This manuscript was previously submitted to the Journal of Guidance,
-Control, and Dynamics, whose Editor-in-Chief withdrew it as outside that
-journal's scope (a distributed-control contribution validated on an
-aeroelastic testbed, rather than a guidance, navigation, or flight-control
-result in the narrower sense JGCD covers). We believe AIAA Journal, whose
-scope spans aerospace structures, dynamics, and control without that
-restriction, is the right venue for a paper that sits deliberately across
-those areas.
+This manuscript was previously submitted to two AIAA journals, each of
+which returned it as outside their scope, for opposite reasons. The
+Journal of Guidance, Control, and Dynamics withdrew it as insufficiently
+narrow to guidance, navigation, and flight control in the sense that
+journal covers. AIAA Journal subsequently returned it as outside its
+scope of fundamentals/methods contributions because of its applied
+nature, and suggested the authors consider a relevant journal from the
+manuscript's own references. We agree with that assessment: this is an
+applied study of active flutter suppression on a specific aeroelastic
+testbed, in the same genre as prior work we cite that appeared in this
+journal (Mu et al., "Machine learning-based active flutter suppression
+for a flexible flying-wing aircraft," JSV 529, 2022), and we believe the
+Journal of Sound and Vibration, rather than a fundamentals-only or
+guidance-and-control-only venue, is the right home for it.
 
 The paper studies active flutter suppression on a wing with several
 independently actuated trailing-edge surfaces, each commanded by its own
@@ -40,23 +46,22 @@ refinement did not survive correction for multiple comparisons once
 compared against the full family of alternatives) at the same statistical
 standard as the positive ones.
 
-We believe this manuscript is a strong fit for AIAA Journal: it derives a
-result from the structural-dynamics equations of motion of an aeroelastic
-plant (a Goland wing), validates it against an unsteady vortex-lattice
-solver and a classical decentralised control baseline, and uses that
-physically grounded testbed to answer a distributed-control and
-credit-assignment question that a single-discipline aerodynamics,
-structures, or guidance-and-control journal is not positioned to referee
-on its own. It also engages directly with the certification gap between a
-learned policy and a classical design with a known stability margin, which
-we discuss explicitly in the paper.
+We believe this manuscript is a strong fit for the Journal of Sound and
+Vibration: it is a validated structural-dynamics and vibration-control
+study -- a Goland wing modelled from its equations of motion, cross-checked
+against an unsteady vortex-lattice solver, with active suppression compared
+against a six-rung classical control ladder -- using multi-agent
+reinforcement learning as the control method under test rather than as the
+paper's primary contribution in its own right. It also engages directly
+with the certification gap between a learned policy and a classical design
+with a known stability margin, which we discuss explicitly in the paper.
 
-Other than the JGCD submission disclosed above, this manuscript, in whole
-or in substantial part, has not previously been submitted to any AIAA
-journal or conference. I will provide any further disclosure ScholarOne
-requests. I declare no conflicts of interest, and no funding was received
-for this work. Data and code needed to reproduce every result are cited in
-the manuscript's Data and Code Availability section.
+Other than the two AIAA submissions disclosed above, this manuscript, in
+whole or in substantial part, has not previously been submitted elsewhere.
+I will provide any further disclosure the editorial system requests. I
+declare no conflicts of interest, and no funding was received for this
+work. Data and code needed to reproduce every result are cited in the
+manuscript's Data and Code Availability section.
 
 Thank you for your consideration. I look forward to your response.
 
