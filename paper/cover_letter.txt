@@ -47,14 +47,18 @@ compared against the full family of alternatives) at the same statistical
 standard as the positive ones.
 
 We believe this manuscript is a strong fit for the Journal of Sound and
-Vibration: it is a validated structural-dynamics and vibration-control
-study -- a Goland wing modelled from its equations of motion, cross-checked
-against an unsteady vortex-lattice solver, with active suppression compared
-against a six-rung classical control ladder -- using multi-agent
-reinforcement learning as the control method under test rather than as the
-paper's primary contribution in its own right. It also engages directly
-with the certification gap between a learned policy and a classical design
-with a known stability margin, which we discuss explicitly in the paper.
+Vibration under category A of its scope statement, "active and adaptive
+control of sound and vibration: analysis, design": it derives a control
+law's per-agent credit signal directly from the plant's energy equations
+of motion, then validates the resulting active-control design -- a Goland
+wing modelled from those equations, cross-checked against an unsteady
+vortex-lattice solver -- against a six-rung classical control ladder.
+Multi-agent reinforcement learning is the control method under test here,
+not the paper's contribution in its own right, and the paper's most
+general finding (Section 5.4) is stated as one about active vibration
+control broadly, not only about this wing. It also engages directly with
+the certification gap between a learned policy and a classical design with
+a known stability margin, which we discuss explicitly in the paper.
 
 Other than the two AIAA submissions disclosed above, this manuscript, in
 whole or in substantial part, has not previously been submitted elsewhere.
