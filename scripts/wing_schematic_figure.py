@@ -67,11 +67,25 @@ def _draw_planform(axes, wing, colour_of, ink, ink_muted) -> None:
 
     semispan, chord = wing.semispan, wing.chord
 
+    # A single cantilevered semispan wing (the Goland benchmark this paper
+    # uses), root fixed at y=0 and tip free at y=semispan -- not a mirrored
+    # pair of wings either side of a fuselage. Mirroring it would draw six
+    # surfaces where the model, and every other panel and the whole rest of
+    # the paper, has exactly three.
     outline_y = np.array([0.0, semispan, semispan, 0.0, 0.0])
     outline_x = np.array([0.0, 0.0, chord, chord, 0.0])
-    for side in (1.0, -1.0):
-        axes.plot(side * outline_y, outline_x, color=ink, lw=1.1)
-        axes.fill(side * outline_y, outline_x, color="#eef1f4", zorder=0)
+    axes.plot(outline_y, outline_x, color=ink, lw=1.1)
+    axes.fill(outline_y, outline_x, color="#eef1f4", zorder=0)
+
+    # Standard engineering hatching for a fixed (cantilever) support at the
+    # root, so "cantilever" in the text has a visual referent.
+    wall_x0, wall_x1 = -0.12 * chord, 1.12 * chord
+    axes.plot([0.0, 0.0], [wall_x0, wall_x1], color=ink, lw=1.6, zorder=4)
+    n_hatches = 7
+    for i in range(n_hatches):
+        hx = wall_x0 + (wall_x1 - wall_x0) * i / (n_hatches - 1)
+        axes.plot([0.0, -0.06 * semispan], [hx, hx - 0.06 * chord],
+                   color=ink, lw=0.6, zorder=4)
 
     # Staggered label depths, because the three stations sit close enough in
     # span that same-depth labels collide.
@@ -80,28 +94,26 @@ def _draw_planform(axes, wing, colour_of, ink, ink_muted) -> None:
         y0, y1 = surface.y_start_frac * semispan, surface.y_end_frac * semispan
         hinge_x = surface.hinge_frac * chord
         colour = colour_of(k)
-        for side in (1.0, -1.0):
-            origin_y = side * y1 if side < 0 else y0
-            axes.add_patch(
-                Rectangle(
-                    (origin_y, hinge_x), (y1 - y0), chord - hinge_x,
-                    facecolor=colour, edgecolor=ink, lw=0.6, alpha=0.85, zorder=2,
-                )
+        axes.add_patch(
+            Rectangle(
+                (y0, hinge_x), (y1 - y0), chord - hinge_x,
+                facecolor=colour, edgecolor=ink, lw=0.6, alpha=0.85, zorder=2,
             )
-            station = 0.5 * (y0 + y1)
-            axes.plot([side * station], [0.35 * chord], "o", color=ink, ms=4,
-                       zorder=3, markerfacecolor="white", markeredgewidth=1.0)
+        )
+        station = 0.5 * (y0 + y1)
+        axes.plot([station], [0.35 * chord], "o", color=ink, ms=4,
+                   zorder=3, markerfacecolor="white", markeredgewidth=1.0)
         axes.annotate(
             surface.name.replace("_", " "),
-            xy=(0.5 * (y0 + y1), hinge_x - 0.05 * chord),
-            xytext=(0.5 * (y0 + y1), label_depth[k] * chord),
+            xy=(station, hinge_x - 0.05 * chord),
+            xytext=(station, label_depth[k] * chord),
             ha="center", va="top", fontsize=6.9, color=colour,
             arrowprops=dict(arrowstyle="-", color=colour, lw=0.7),
         )
 
-    axes.plot([-semispan, semispan], [wing.ea_frac * chord] * 2, "--",
+    axes.plot([0.0, semispan], [wing.ea_frac * chord] * 2, "--",
                color=ink_muted, lw=0.9)
-    axes.plot([-semispan, semispan], [wing.cg_frac * chord] * 2, ":",
+    axes.plot([0.0, semispan], [wing.cg_frac * chord] * 2, ":",
                color=ink_muted, lw=0.9)
     # EA and CG sit only 0.10c apart -- far closer than the two labels' own
     # text height at this scale -- so each is anchored to extend AWAY from the
@@ -119,13 +131,13 @@ def _draw_planform(axes, wing, colour_of, ink, ink_muted) -> None:
     axes.annotate(
         "sensor station\n(accel. pair, fwd/aft of EA)",
         xy=(0.5 * (middle.y_start_frac + middle.y_end_frac) * semispan, 0.35 * chord),
-        xytext=(semispan * 0.30, 1.18 * chord),
+        xytext=(semispan * 0.55, 1.18 * chord),
         fontsize=6.6, color=ink_muted, ha="center", va="bottom",
         arrowprops=dict(arrowstyle="->", color=ink_muted, lw=0.6,
                          connectionstyle="arc3,rad=-0.3"),
     )
 
-    axes.set_xlim(-semispan * 1.16, semispan * 1.16)
+    axes.set_xlim(-0.20 * semispan, semispan * 1.16)
     axes.set_ylim(-0.95 * chord, 1.75 * chord)
     axes.set_aspect("equal")
     axes.axis("off")
