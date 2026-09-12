@@ -1,25 +1,31 @@
-September 9, 2026
+September 12, 2026
 
 Dear Editor-in-Chief,
 
 We are pleased to submit our manuscript, "Physics-Exact Credit Assignment
-for Multi-Agent Flutter Suppression," for consideration as a Research
-Article in the Journal of Sound and Vibration.
+for Multi-Agent Flutter Suppression," for consideration as a Regular Paper
+in Array. This submission is a transfer, via Elsevier's Article Transfer
+Service, of manuscript JSV-D-26-02695 from the Journal of Sound and
+Vibration, which recommended Array among its suggested destinations after
+declining the manuscript as outside its scope.
 
-This manuscript was previously submitted to two AIAA journals, each of
-which returned it as outside their scope, for opposite reasons. The
-Journal of Guidance, Control, and Dynamics withdrew it as insufficiently
-narrow to guidance, navigation, and flight control in the sense that
-journal covers. AIAA Journal subsequently returned it as outside its
-scope of fundamentals/methods contributions because of its applied
-nature, and suggested the authors consider a relevant journal from the
-manuscript's own references. We agree with that assessment: this is an
-applied study of active flutter suppression on a specific aeroelastic
-testbed, in the same genre as prior work we cite that appeared in this
-journal (Mu et al., "Machine learning-based active flutter suppression
-for a flexible flying-wing aircraft," JSV 529, 2022), and we believe the
-Journal of Sound and Vibration, rather than a fundamentals-only or
-guidance-and-control-only venue, is the right home for it.
+This manuscript has been submitted to three prior venues, each of which
+returned it as outside their scope, for three different reasons. The
+Journal of Guidance, Control, and Dynamics found it insufficiently narrow
+to guidance, navigation, and flight control in the sense that journal
+covers. AIAA Journal returned it as outside its scope of fundamentals and
+methods contributions because of its applied nature. The Journal of Sound
+and Vibration, most recently, found it outside its scope of sound- and
+vibration-phenomena contributions and suggested a journal on control or a
+specialist aircraft journal instead. Read together, we believe these three
+verdicts agree on what this manuscript actually is: a multi-agent
+reinforcement-learning method, validated on a physically grounded
+aeroelastic control problem, rather than a contribution to any of those
+three fields' own core subject matter. We believe Array -- whose scope
+explicitly includes Artificial Intelligence, Machine Learning and
+Robotics, and Control and Signal Processing, alongside Interdisciplinary
+Applications -- is the venue where that is the point of the paper rather
+than a categorisation difficulty.
 
 The paper studies active flutter suppression on a wing with several
 independently actuated trailing-edge surfaces, each commanded by its own
@@ -46,32 +52,34 @@ refinement did not survive correction for multiple comparisons once
 compared against the full family of alternatives) at the same statistical
 standard as the positive ones.
 
-We believe this manuscript is a strong fit for the Journal of Sound and
-Vibration under category A of its scope statement, "active and adaptive
-control of sound and vibration: analysis, design": it derives a control
-law's per-agent credit signal directly from the plant's energy equations
-of motion, then validates the resulting active-control design -- a Goland
-wing modelled from those equations, cross-checked against an unsteady
-vortex-lattice solver -- against a six-rung classical control ladder.
-Multi-agent reinforcement learning is the control method under test here,
-not the paper's contribution in its own right, and the paper's most
-general finding (Section 5.4) is stated as one about active vibration
-control broadly, not only about this wing. It also engages directly with
-the certification gap between a learned policy and a classical design with
-a known stability margin, which we discuss explicitly in the paper.
+The manuscript's author list is restored here to the full collaborative
+team for this project; the three prior submissions listed the
+corresponding author alone. We disclose this change transparently and will
+complete Array's Authorship Change Request process, with written
+confirmation from all four authors, alongside this submission.
 
-Other than the two AIAA submissions disclosed above, this manuscript, in
+Other than the three prior submissions disclosed above, this manuscript, in
 whole or in substantial part, has not previously been submitted elsewhere.
-I will provide any further disclosure the editorial system requests. I
+We will provide any further disclosure the editorial system requests. We
 declare no conflicts of interest, and no funding was received for this
 work. Data and code needed to reproduce every result are cited in the
 manuscript's Data and Code Availability section.
 
-Thank you for your consideration. I look forward to your response.
+Thank you for your consideration. We look forward to your response.
 
 Sincerely,
 
-Quang-Vinh Dang
+Quang-Vinh Dang (corresponding author)
 Senior Lecturer, School of Computing
 British University Vietnam, Hung Yen, Vietnam
 vinh.dq4@buv.edu.vn
+
+Hai Dang Nguyen
+XTECH AI Technology, Ho Chi Minh City, Vietnam
+
+Ngoc Minh La
+Vietnamese German University, Ho Chi Minh City, Vietnam
+
+Minh Ngoc Dinh
+School of Data Science & Information Technology, Millennia University,
+Ho Chi Minh City, Vietnam
