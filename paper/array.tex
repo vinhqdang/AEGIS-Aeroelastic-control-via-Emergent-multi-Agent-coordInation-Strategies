@@ -238,6 +238,30 @@ the classical sense rather than separate \emph{learning} agents estimating
 from partial observability, the distinction that gives rise to the
 credit-assignment question this paper poses.
 
+The closer sibling to our setting is not the flutter literature at all but
+a recent line of work applying multi-agent RL to vibration control of
+several physically-coupled flexible structures. Qiu et al.\ control three
+coupled flexible beams with single-agent PPO
+\cite{qiu2022ppobeams} and then, in a direct precedent for the
+question we ask, with a value-decomposition-network credit signal shared
+across per-beam agents \cite{qiu2022vdnbeams}, later extended to a
+movable, trajectory-planning three-beam rig \cite{liu2025tshapebeam}. This
+is the same structural question we pose -- several learning agents
+sharing one coupled physical plant -- answered with an
+\emph{estimated} value decomposition; our contribution is that for an
+energy-conserving aeroelastic plant the analogous decomposition is
+available in closed form, without fitting a mixing network to team
+return, and we validate that difference directly against a VDN-style
+baseline of our own (Section~\ref{sec:ablations}). Multi-agent RL has also
+reached distributed aerospace control at the vehicle level rather than the
+structural one: graph-based MARL coordinates large UAV swarms
+\cite{zhao2024uavswarm}, and comparable architectures coordinate UAV
+swarms for mobile access applications \cite{park2023uavswarm} -- a
+different coupling (vehicles sharing airspace and communication, not one
+airframe's structural dynamics) but the same broader trend of multi-agent
+learning displacing single-agent or centralised designs across aerospace
+control problems.
+
 That decentralisation costs closed-loop performance relative to a
 centralised design with the same model is a classical result, not a
 symptom of using learning \cite{siljak1991decentralized,
@@ -253,7 +277,14 @@ factorisation \cite{sunehag2018vdn,rashid2018qmix}, counterfactual baselines
 \cite{foerster2018coma}, surveyed in
 \cite{albrecht2023survey,scalingmarl2025,multilevelcredit2025} -- all
 estimate the credit decomposition statistically from returns a policy
-happens to collect, because the environment is treated as a black box; our
+happens to collect, because the environment is treated as a black box.
+Since QMIX, the factorisation itself has been refined repeatedly --
+QTRAN relaxes QMIX's monotonicity restriction on the mixing network
+\cite{son2019qtran}, QPLEX recasts the same relaxation as a duplex
+dueling architecture \cite{wang2021qplex}, and LICA learns an implicit,
+continuous credit signal rather than a discrete factorisation
+\cite{zhou2020lica} -- but every refinement still fits the decomposition
+from returns; none derives it from the plant's own dynamics as we do. Our
 contribution is narrower and complementary, exploiting physical structure
 that these general-purpose methods are built to work without. The formal
 setting is the decentralised POMDP
@@ -262,6 +293,36 @@ communication, CommNet \cite{sukhbaatar2016commnet} and TarMAC
 \cite{das2019tarmac} learn message content and routing end to end; we
 instead fix both to physics-derived, bandwidth-bounded choices, and report
 that neither helped (Section~\ref{sec:ablations}).
+
+The certification gap we raise in Section~\ref{sec:discussion} is an
+active research question in its own right, not a novel observation of
+ours. Two lines of work bear directly on the monitored-residual
+architecture we propose but do not build. Certified-by-construction safe
+RL enforces a control barrier or Lyapunov constraint during learning
+itself \cite{chow2018lyapunovsafe,cheng2019cbfsafe,marvi2021cbfsafe}, and
+the same idea has been extended to the multi-agent case with
+decentralised barrier certificates learned per agent
+\cite{qin2021safemarl,gu2023safemarl} -- Brunke et al.\ survey this and
+the adjacent verification literature
+\cite{brunke2022safelearning,katz2017reluplex,ivanov2019verisig}.
+Separately, runtime assurance wraps an \emph{already-trained} policy in a
+monitor that reverts to a certified base law outside a pre-verified
+envelope \cite{lazarus2020runtimeassurance}, closer in spirit to
+\texttt{residual\_only} (Section~\ref{sec:ablations}): a certified
+decentralised LQG as the default law, our learned correction bounded and
+initialised near zero, and a monitor neither this paper nor its testbed
+verification (Section~\ref{sec:sharpy}) yet builds. A second, related gap
+is that every result here is in simulation: sim-to-real transfer for
+learned physical control is its own literature, from domain randomisation
+\cite{tobin2017domainrandomization} through general surveys
+\cite{zhao2020sim2realsurvey} to a fixed-wing pitch-control instance
+\cite{wada2022sim2realuav} directly comparable in spirit to the plant
+studied here, and we have not attempted it. We are not aware of a
+multi-agent treatment of active gust load alleviation, the closest sibling
+problem to flutter suppression by control-surface layout and objective;
+if one exists in the classical or single-agent-learned literature, the
+credit-assignment argument of Section~\ref{sec:method} should carry over
+to it with no change beyond the reward's physical definition.
 
 Finally, our central caution about exploration scale has direct precedent
 in general-purpose reinforcement learning
